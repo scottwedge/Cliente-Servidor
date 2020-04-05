@@ -1,0 +1,7 @@
+__pycache__/
+temp.py
+**/archivos/*
+**/archivosDescargados/*
+.vscode
+**/arrays/*
+**/.ipynb_checkpoints/
