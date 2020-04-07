@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt 
+
+
 def show(clusters, centroids = None):
     colors = ["red", "green", "blue", "lime", "salmon", "skyblue"]
     n_colors = len(colors)

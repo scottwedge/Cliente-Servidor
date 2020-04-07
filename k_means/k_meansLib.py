@@ -44,28 +44,47 @@ def createCentroids(mins_max, n_clusters, n_features):
             centroids[i][j] = np.random.uniform(low = min_max[0], high = min_max[1])
     return centroids
 
+def isEmptyCluster(clusters):
+    empty = False
+    i = 0
+    while not empty and i < len(clusters):
+        if clusters[i].shape[0] == 0:
+            empty = True
+        i += 1
+    return empty
 
 def k_means(data, n_clusters):
     n_data = data.shape[0]
     n_features = data.shape[1]
-    
+
+    #Creo los centroides de manera aleatoria en el rango 
+    #de cada dimension de los puntos
     mins_max = calculateMinMaxFeatures(data, n_features)
     centroids = createCentroids(mins_max, n_clusters, n_features)
 
     y = np.zeros(n_data)
     changing = True
     while changing:
+        #Calculo la distancia de cada punto a todos los clusters 
+        #y lo asigno a un cluster
         y_new = calculateDistanceAndAssign(data, centroids)
+        #Si ningun punto ha cambiado de cluster paro de iterar
         if np.array_equal(y, y_new):
            changing = False
         else:
             y = y_new
+            #Divido los puntos por clusters, segun el y calculado antes
             clusters = divideData(data, y, n_clusters, n_data, n_features)
-            # show(clusters, centroids = centroids)
+            #Volvemos a incializar los clusters hasta que todos 
+            # #tengan al menos un elemento
+            while isEmptyCluster(clusters):
+                print("Empty cluster!")
+                centroids = createCentroids(mins_max, n_clusters, n_features)
+                clusters = divideData(data, y, n_clusters, n_data, n_features)
 
-            centroids = moveCentroid(clusters, centroids)
-            # clear_output(wait = True)
-            # time.sleep(0.5)
+        #Muevo los centroides a la media de los puntos que le pertenecen
+        centroids = moveCentroid(clusters, centroids)
+
     print("Acabe")
     if n_features == 2:
         show(clusters, centroids=centroids)
