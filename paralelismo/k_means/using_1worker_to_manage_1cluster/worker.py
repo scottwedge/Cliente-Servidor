@@ -44,7 +44,6 @@ class Worker:
         #Envia las distancias calculadas al sink
         print("Calculating distance")
         centroid = msg["centroid"]
-        print(centroid)
         distances = self.calculateDistances(centroid)
         
         self.to_sink.send_json({
