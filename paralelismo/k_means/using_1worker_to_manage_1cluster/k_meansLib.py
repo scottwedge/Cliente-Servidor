@@ -32,8 +32,8 @@ def moveCentroid(points_groups, old_centroids):
 def calculateMinMaxFeatures(data, n_features):
     mins_max = []
     for i in range(n_features):
-        min_f = np.min(data[:, 0])
-        max_f = np.max(data[:, 0])
+        min_f = np.min(data[:, i])
+        max_f = np.max(data[:, i])
         mins_max.append((min_f, max_f))
     return mins_max
 
@@ -63,6 +63,7 @@ def k_means(data, n_clusters):
     centroids = createCentroids(mins_max, n_clusters, n_features)
 
     y = np.zeros(n_data)
+    empty_cluster = False
     changing = True
     while changing:
         #Calculo la distancia de cada punto a todos los clusters 
@@ -77,13 +78,15 @@ def k_means(data, n_clusters):
             clusters = divideData(data, y, n_clusters, n_data, n_features)
             #Volvemos a incializar los clusters hasta que todos 
             # #tengan al menos un elemento
-            while isEmptyCluster(clusters):
-                print("Empty cluster!")
+            empty_cluster = isEmptyCluster(clusters)
+            if empty_cluster:
+                print("Empty cluster, restarting centroids")
                 centroids = createCentroids(mins_max, n_clusters, n_features)
-                clusters = divideData(data, y, n_clusters, n_data, n_features)
 
-        #Muevo los centroides a la media de los puntos que le pertenecen
-        centroids = moveCentroid(clusters, centroids)
+
+        if not empty_cluster:
+            #Muevo los centroides a la media de los puntos que le pertenecen
+            centroids = moveCentroid(clusters, centroids)
 
     print("Acabe")
     if n_features == 2:
