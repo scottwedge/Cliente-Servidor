@@ -9,10 +9,16 @@ En esta aproximacion, el ventilator:
 1.Instancia los centroides
 2.Llama a los workers diciendoles que cluster deben manejar y
   como instanciar el dataset
-3.Los activa enviandoles 'operate' y la posicion del cluster
-  porque se supone que los workers tienen acceso al dataset
-4.Recibe la nueva posicion de los clusters asi como los puntos 
-  que pertenecen a cada cluster del sink 
+3.Los activa enviandoles la operacion y 
+    a.la posicion del cluster  para el que deben calcular la distancia 
+    de todos los puntos
+    b.Los tags y el numero de cluster
+     para que agrupen los datos en el cluster y muevan el centroide
+     que les corresponde
+4.Recibe la nueva posicion 
+    a.Los tags de todos los puntos
+    b.La nueva posicion de los centroides asi como los puntos 
+    que pertenecen a cada cluster del sink 
 """
 
 class Ventilator:
@@ -30,15 +36,8 @@ class Ventilator:
         self.from_sink = self.context.socket(zmq.REP)
         self.from_sink.bind(f"tcp://{self.my_dir_sink}")
 
-    def divideData(self):
-        self.clusters = []
-        for cluster in range(self.n_clusters):
-            self.clusters.append(
-                np.array([self.x[i, :] 
-                        for i in range(self.n_data) if self.y[i] == cluster]))  
-
-
     def instanciateDataset(self):
+        #Creamos el dataset
         self.x, self.y = make_blobs(n_samples = self.n_data, 
                                 n_features=self.n_features, 
                                 centers = self.n_clusters)
@@ -48,22 +47,35 @@ class Ventilator:
             plt.show()
 
     def calculateMinMaxFeatures(self):
-        self.mins_max = []
+        #Calcula el minimo y el maximo de cada atributo para asi
+        #inicializar el centroide 
+        mins_max = []
         for i in range(self.n_features):
             min_f = np.min(self.x[:, i])
             max_f = np.max(self.x[:, i])
-            self.mins_max.append((min_f, max_f))
+            mins_max.append((min_f, max_f))
+        return mins_max
 
 
-    def createCentroids(self):
-        centroids = []
+    def createCentroids(self, mins_max):
+        #Creamos los centroides de manera aleatoria en el rango de cada 
+        #caracteristica
+        self.centroids = []
         for i in range(self.n_clusters):
             centroid = [] 
-            for j, min_max in enumerate(self.mins_max):
+            for j, min_max in enumerate(mins_max):
                 centroid.append(np.random.uniform(low = min_max[0], high = min_max[1]))
-            centroids.append(centroid)
-        return centroids
-
+            self.centroids.append(centroid)
+        
+    def showResult(self, clusters):
+        #Muestra los puntos asignados a cada cluster y si el numero de
+        #features es de 2, mostrara la grafica
+        for i, c in enumerate(clusters):
+            print(f"\tCLUSTER{i+1}")
+            [print(point) for point in c]
+        
+        if self.n_features == 2:
+            show(clusters, self.centroids)
 
     def sendInitialData(self):
         #Para no enviarle el dataset en cada iteracion. 
@@ -80,6 +92,7 @@ class Ventilator:
         })
 
     def isEmptyCluster(self, clusters):
+        #Verificamos si algun cluster quedo vacio
         empty = False
         i = 0
         while not empty and i < len(clusters):
@@ -87,27 +100,42 @@ class Ventilator:
                 empty = True
             i += 1
         return empty
+    
 
+    def sendCalculateDistance(self):
+        #Los workers calculan la distanciade cada punto a un  cluster
+        for centroid in self.centroids:
+            self.to_workers.send_json({
+                "operation" : "distance",
+                "centroid" : centroid,
+            })
+
+    def sendCalculateClustersAndCentroids(self, y_new):
+        #Mando a los workers a que muevan el centroide
+        #y que con los tags armen los clusters
+        for index in range(len(self.centroids)):
+            self.to_workers.send_json({
+                "operation" : "move_centroid",
+                "y" : y_new,
+                "n_cluster" : index
+            })
+    
     def kmeans(self):
+        #Metodo k_means paralelizado.
         input("Press enter when workers are ready")
         self.sendInitialData()
         #Creo los centroides de manera aleatoria en el rango 
         #de cada dimension de los puntos
-        self.calculateMinMaxFeatures() 
-        centroids = self.createCentroids()
+        mins_max = self.calculateMinMaxFeatures() 
+        self.createCentroids(mins_max)
 
         self.y =  np.zeros(self.n_data)
         changing = True
-        while changing:
+        iters = 0
+        while changing and iters < self.max_iters:
+            iters += 1
             print("Operating")
-            #Calculo la distancia de cada punto a todos los clusters 
-            #y lo asigno a un cluster
-            for centroid in centroids:
-                print("Sending centroids")
-                self.to_workers.send_json({
-                    "operation" : "distance",
-                    "centroid" : centroid,
-                })
+            self.sendCalculateDistance()
 
             #Del sink recibo los tags
             print("Waiting result from sink")
@@ -115,19 +143,18 @@ class Ventilator:
             self.from_sink.send(b" ")
             y_new = result["y"]
 
+            #Le envio a los workers los tags para que me separe los
+            #puntos y calcule la nueva posicion de cada centroide
+            self.sendCalculateClustersAndCentroids(y_new)
 
-            #Mando a los workers a que muevan el centroide
-            for index in range(len(centroids)):
-                print("Sending to move")
-                self.to_workers.send_json({
-                    "operation" : "move_centroid",
-                    "y" : y_new,
-                    "n_cluster" : index
-                })
+            #Del sink recibo los cluster y centroides, en este caso
+            #el sink solo pego los mensajes que le llegaron del worker
             msg = self.from_sink.recv_json()
             self.from_sink.send(b" ")
             clusters = msg["clusters"]
-            centroids = msg["centroids"]
+            lens = [len(cluster) for cluster in clusters]
+            print(sorted(lens))
+            self.centroids = msg["centroids"]
 
             #Si ningun punto ha cambiado de cluster paro de iterar
             if np.array_equal(self.y, np.asarray(y_new)):
@@ -138,14 +165,9 @@ class Ventilator:
                 # tengan al menos un elemento
                 empty_cluster = self.isEmptyCluster(clusters)
                 if empty_cluster:
-                    self.createCentroids()
+                    self.createCentroids(mins_max)
 
-        for i, c in enumerate(clusters):
-            print(f"\tCLUSTER{i+1}")
-            [print(point) for point in c]
-        
-        if self.n_features == 2:
-            show(clusters, centroids)
+        self.showResult(clusters)
 
 
             
@@ -154,6 +176,7 @@ class Ventilator:
         self.n_clusters = n_clusters
         self.n_features = n_features
         self.n_data = 1000
+        self.max_iters = 1000
         self.instanciateDataset()
         
         self.my_dir = my_dir

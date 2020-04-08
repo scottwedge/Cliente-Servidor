@@ -1,9 +1,10 @@
 """
     En esta implementacion, el sink:
     1.Recoge las distancias a cada cluster de los workers 
-    2.Calcula el minimo de las distancias y asigna el punto a un cluster
-    5.Calcula la nueva posicion de los centroides
-    3.Envia los resultados al ventilator
+    3.Calcula la distancia minima de cada punto a cada cluster y 
+    se lo envia al ventilator
+    2.Recoge los clusters y los centroides de los workers y los pega para
+    enviarselos al ventilator
 """
 
 import zmq 
@@ -23,6 +24,23 @@ class Sink:
         self.to_ventilator = self.context.socket(zmq.REQ)
         self.to_ventilator.connect(f"tcp://{self.dir_ventilator}")
 
+    def sendTags(self, distances):
+        print("Calculating tags")
+        #Calculando la minima distancia
+        y = []
+        for i in range(self.n_data):
+            y.append(int(np.argmin(distances[i, :])))
+        self.to_ventilator.send_json({
+            "y" : y,
+        })
+
+    def sendClustersAndCentroids(self, clusters, centroids):
+        print("Appending clusters")
+        self.to_ventilator.send_json({
+            "clusters" : clusters,
+            "centroids" : centroids
+        })
+
 
     #Funcion donde le llegara el mensaje del ventilator
     def listen(self):
@@ -32,44 +50,26 @@ class Sink:
         self.n_clusters = msg["n_clusters"]
         print("Recieve first message")
 
-        #Pegando todas las distancias
+        #Pegando todas las distanciasy calculando el minimo
+        # O pegando los clusters y centroides
         while True:
-            self.distances = np.zeros((self.n_data, self.n_clusters))
+            distances = np.zeros((self.n_data, self.n_clusters))
             clusters = []
             centroids = []
-
             for cluster in range(self.n_clusters):
-                print("Waiting message from workers")
                 msg = self.from_ventilator.recv_json()
-                print("Message from worker recieved")
 
                 if msg["type"] == "distances":
-                    
-                    distances = np.asarray(msg["distances"])
-                    self.distances[:, cluster] = distances
+                    distance = np.asarray(msg["distances"])
+                    distances[:, cluster] = distance
                 elif msg["type"] == "clusters":
-                    
                     clusters.append(msg["cluster"])
                     centroids.append(msg["centroid"])
 
             if msg["type"] == "distances":
-                print("Calculating tags")
-                #Calculando la minima distancia
-                y = []
-                for i in range(self.n_data):
-                    y.append(int(np.argmin(self.distances[i, :])))
-                print("Sending data to ventilator")
-                self.to_ventilator.send_json({
-                    "y" : y,
-                })
-                
+                self.sendTags(distances)   
             elif msg["type"] == "clusters":
-                print("Appending clusters")
-                print("Sending data to ventilator")
-                self.to_ventilator.send_json({
-                    "clusters" : clusters,
-                    "centroids" : centroids
-                })
+                self.sendClustersAndCentroids(clusters, centroids)
             self.to_ventilator.recv()
 
     def __init__(self, dir_sink, dir_ventilator):

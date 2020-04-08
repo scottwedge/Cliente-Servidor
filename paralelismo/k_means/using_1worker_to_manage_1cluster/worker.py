@@ -1,6 +1,8 @@
 """
     Para esta implementacion, cada worker:
     1.Calcula la distancia del todos los puntos a un centroide
+    2.Agrupa los puntos segun un vector de tags dado y con este 
+    agrupamiento calcula la nueva posicion del centroide
 """
 import zmq
 import argparse 
@@ -9,6 +11,7 @@ import numpy as np
 class Worker:
 
     def calculateDistances(self, centroid):
+        #Calcula la distancia entre todos los puntos y un centroide dado
         distances = []
         for i in range(self.n_data):
             distances.append(distance.euclidean(self.data[i], centroid))
@@ -16,56 +19,69 @@ class Worker:
 
 
     def createCluster(self, y, n_cluster):
-        return [np.ndarray.tolist(self.data[i]) for i in range(self.n_data) if y[i] == n_cluster]
+        #Agrupa los puntos segun un numero de cluster dado y unos tags
+        return [np.ndarray.tolist(self.data[i]) 
+                for i in range(self.n_data) if y[i] == n_cluster]
         
 
     def moveCentroid(self, cluster):
+        #Mueve el centroide al promedio de los puntos pertenecientes al cluster
         if len(cluster) != 0:
             centroid = np.ndarray.tolist((np.average(cluster, axis = 0)))
         else:
             centroid = [0]*self.n_features
         return centroid
 
-
-    def listen(self): 
-        print("Ready")
-        #Ciclo en el que recibe los dos arrays y los multiplica
+    def recieveInitialData(self):
+        #Recibe el dataset entero para no recibirlo muchas veces
         msg = self.from_ventilator.recv_json()
         self.data = np.asarray(msg["data"])
         self.n_features = msg["n_features"]
         print("Recieved first message")
         self.n_data = self.data.shape[0]
+
+    def sendDistances(self, msg):
+        #Envia las distancias calculadas al sink
+        print("Calculating distance")
+        centroid = msg["centroid"]
+        print(centroid)
+        distances = self.calculateDistances(centroid)
+        
+        self.to_sink.send_json({
+            "type" : "distances",
+            "distances" : distances,
+        })
+
+    def sendClusterAndCentroid(self, msg):
+        #Envia un cluster y su centroide al sink
+        print("Moving centroid")
+        y = msg["y"]
+        n_cluster = msg["n_cluster"]
+        cluster = self.createCluster(y, n_cluster)
+        #Muevo los centroides a la media de los puntos que le pertenecen
+        centroid = self.moveCentroid(cluster)
+        print("Sending data to sink")
+        self.to_sink.send_json({
+            "type" : "clusters",
+            "centroid" : centroid,
+            "cluster" : cluster
+        })
+
+    def listen(self): 
+        print("Ready")
+        #Ciclo en el que recibe los dos arrays y los multiplica
+        self.recieveInitialData()
         while True:
-            print("Waiting message from ventilator")
             msg = self.from_ventilator.recv_json()
             oper = msg["operation"]
 
-
             if oper == "distance":
-                print("Calculating distance")
-                centroid = msg["centroid"]
-                print(centroid)
-                distances = self.calculateDistances(centroid)
-                
-                print("Sending data to sink")
-                self.to_sink.send_json({
-                    "type" : "distances",
-                    "distances" : distances,
-                })
+                self.sendDistances(msg)
 
             elif oper == "move_centroid":
-                print("Moving centroid")
-                y = msg["y"]
-                n_cluster = msg["n_cluster"]
-                cluster = self.createCluster(y, n_cluster)
-                #Muevo los centroides a la media de los puntos que le pertenecen
-                centroid = self.moveCentroid(cluster)
-                print("Sending data to sink")
-                self.to_sink.send_json({
-                    "type" : "clusters",
-                    "centroid" : centroid,
-                    "cluster" : cluster
-                })
+                self.sendClusterAndCentroid(msg)
+
+
     def createSockets(self):
         self.context = zmq.Context()
 
