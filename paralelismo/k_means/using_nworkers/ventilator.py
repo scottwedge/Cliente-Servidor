@@ -10,7 +10,7 @@ En esta aproximacion, el ventilator:
 2.Llama a los workers como instanciar el dataset
 3.Los activa enviandoles la operacion y 
     a.Los puntos para los que deben calcular la distancia a 
-    todos los clusters, junto con los clusters
+    todos los clusters, junto con los centroides
 
 4.Recibe 
     a.Los clusters
@@ -85,6 +85,8 @@ class Ventilator:
         #         "position" : []
         #     })
 
+        #Calculando el numero de operaciones que se haran
+        #para decirle al sink lo que debe esperar
         opers = self.n_data // self.chunk_worker
         if self.n_data % self.chunk_worker != 0:
             opers += 1
@@ -109,7 +111,8 @@ class Ventilator:
     
 
     def sendCalculateDistance(self):
-        #Los workers calculan la distanciade cada punto a un  cluster
+        #Los workers calculan la distancia de un numero determinado
+        # de puntos punto a todos los  cluster
         i = 0
         while i < self.n_data:
             self.to_workers.send_json({
@@ -137,7 +140,8 @@ class Ventilator:
 
             self.sendCalculateDistance()
 
-            #Del sink recibo los tags
+            #Del sink recibo los tags, los clusters y los 
+            #centroides
             print("Waiting result from sink")
             result = self.from_sink.recv_json()
             self.from_sink.send(b" ")

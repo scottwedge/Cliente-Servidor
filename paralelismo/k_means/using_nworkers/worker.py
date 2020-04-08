@@ -1,8 +1,9 @@
 """
     Para esta implementacion, cada worker:
-    1.Calcula la distancia del todos los puntos a un centroide
-    2.Agrupa los puntos segun un vector de tags dado y con este 
-    agrupamiento calcula la nueva posicion del centroide
+    1.Calcula la distancia del los que le llegaron puntos a 
+      todos los centroides
+    2.Con esta distancia saca el vector de tags y los clusters para
+    el numero determinado de puntos 
 """
 import zmq
 import argparse 
@@ -11,7 +12,8 @@ import numpy as np
 class Worker:
 
     def recieveInitialData(self):
-        #Recibe el dataset entero para no recibirlo muchas veces
+        #Por ahora no se usa, ya que como no se cuantos workers tengo
+        #no puedo enviar el data set al inicio
         msg = self.from_ventilator.recv_json()
         self.data = np.asarray(msg["data"])
         self.n_features = msg["n_features"]
@@ -22,7 +24,7 @@ class Worker:
 
     def calculateDistances(self, centroids, points):
         #Calcula la distancia entre todos los puntos y un centroide dado
-        #Matriz data * centroids
+        #Matriz de tamanio data * centroids
         distances = []
         for p in points:
             distance_point = []
@@ -33,12 +35,15 @@ class Worker:
     
     
     def calculateTagsAndSum(self, distances, points, n_clusters):
-        #print(points)
+        #A partir de las distancias anteriormente calculadas, crea 
+        #los clusters y los tags, ademas de sumar los puntos de cada
+        #cluster para que luego el sink los pueda promediar
+
         n_features = points.shape[1]
-        #Con las distancias calcula los tags, los cluster, y la 
-        #suma de los puntos
-        print("Calculating tags")
+    
+        print("Calculating tags, clusters and sum")
         y = []
+        #Inicializo los clusters vacios
         clusters = []
         [clusters.append([]) for i in range(n_clusters)]
         sum_points = np.zeros((n_clusters, n_features))
@@ -58,10 +63,11 @@ class Worker:
         while True:
             msg = self.from_ventilator.recv_json()
             print("Calculating distance")
-            points_to_work = np.asarray(msg["points"])
-            min_pos, max_pos = msg["position"]
-            #print(min_pos, max_pos)
+            points_to_work = np.asarray(msg["points"]) #Puntos a trabajar
+            min_pos, max_pos = msg["position"] #Posiciones para luego armar bien el 
+                                               # vector de tags
             centroids = msg["centroids"]
+ 
             distances = self.calculateDistances(centroids, 
                                                 points_to_work)
 
