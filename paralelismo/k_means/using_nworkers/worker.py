@@ -9,24 +9,37 @@ import zmq
 import argparse 
 from scipy.spatial import distance
 import numpy as np
+from sklearn.datasets import make_blobs
+
 class Worker:
 
-    def recieveInitialData(self):
+    def instanciateDataset(self):
+        #Creamos el dataset
+        self.x, self.y = make_blobs(n_samples = self.n_data, 
+                                n_features=self.n_features, 
+                                centers = self.n_clusters, 
+                                random_state=self.random_state)
+        
+
+
+    def recieveInitialData(self, msg):
         #Por ahora no se usa, ya que como no se cuantos workers tengo
         #no puedo enviar el data set al inicio
-        msg = self.from_ventilator.recv_json()
-        self.data = np.asarray(msg["data"])
+        self.n_data = msg["n_data"]
         self.n_features = msg["n_features"]
         self.n_clusters = msg["n_clusters"]
+        self.random_state = int(msg["random_state"])
         print("Recieved first message")
-        self.n_data = self.data.shape[0]
+        self.instanciateDataset()
 
 
-    def calculateDistances(self, centroids, points):
+    def calculateDistances(self, centroids):
         #Calcula la distancia entre todos los puntos y un centroide dado
         #Matriz de tamanio data * centroids
+        
+        points = self.x[self.min : self.max]
         distances = []
-        for p in points:
+        for p in (points):
             distance_point = []
             for centroid in centroids:
                 distance_point.append(distance.euclidean(p, centroid))
@@ -34,53 +47,45 @@ class Worker:
         return distances
     
     
-    def calculateTagsAndSum(self, distances, points, n_clusters):
+    def calculateTagsAndSum(self, distances):
         #A partir de las distancias anteriormente calculadas, crea 
         #los clusters y los tags, ademas de sumar los puntos de cada
         #cluster para que luego el sink los pueda promediar
-
-        n_features = points.shape[1]
-    
         print("Calculating tags, clusters and sum")
         y = []
         #Inicializo los clusters vacios
-        clusters = []
-        [clusters.append([]) for i in range(n_clusters)]
-        sum_points = np.zeros((n_clusters, n_features))
-
-        for i in range(len(points)):
-            index_min = int(np.argmin(distances[i]))
+        sum_points = np.zeros((self.n_clusters, self.n_features))
+        index = 0
+        for i in range(self.min, self.max):
+            index_min = int(np.argmin(distances[index]))
             y.append(index_min) #Tags
-            sum_points[index_min] += points[i] #Suma de los puntos
-            clusters[index_min].append(np.ndarray.tolist(points[i])) #Puntos del cluster
+            sum_points[index_min] += self.x[i] #Suma de los puntos
+            index += 1
+        return (y, sum_points)
 
-        return (y, clusters, sum_points)
 
+            
     def listen(self): 
         print("Ready")
-        #Ciclo en el que recibe los dos arrays y los multiplica
-        #self.recieveInitialData()
         while True:
             msg = self.from_ventilator.recv_json()
-            print("Calculating distance")
-            points_to_work = np.asarray(msg["points"]) #Puntos a trabajar
-            min_pos, max_pos = msg["position"] #Posiciones para luego armar bien el 
-                                               # vector de tags
-            centroids = msg["centroids"]
- 
-            distances = self.calculateDistances(centroids, 
-                                                points_to_work)
+            if msg["action"] == "new_dataset":
+                    self.recieveInitialData(msg)
+            else:
 
-            tags, clusters, sum_points = (
-                    self.calculateTagsAndSum(distances, points_to_work, len(centroids)))
+                self.min, self.max = msg["position"]
+        
+                operating = True
+                print("Calculating distance")
+                centroids = msg["centroids"]
 
-            self.to_sink.send_json({
-                "tags" : tags,
-                "sum_points" : np.ndarray.tolist(sum_points), 
-                "clusters" : clusters,
-                "position" : [min_pos, max_pos]
-            })
-
+                distances = self.calculateDistances(centroids)
+                tags, sum_points = self.calculateTagsAndSum(distances)
+                self.to_sink.send_json({
+                    "tags" : tags,
+                    "sum_points" : np.ndarray.tolist(sum_points), 
+                    "position" : [self.min, self.max]
+                })
 
 
     def createSockets(self):

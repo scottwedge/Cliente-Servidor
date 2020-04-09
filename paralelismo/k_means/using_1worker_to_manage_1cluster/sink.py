@@ -34,10 +34,9 @@ class Sink:
             "y" : y,
         })
 
-    def sendClustersAndCentroids(self, clusters, centroids):
-        print("Appending clusters")
+    def sendCentroids(self, centroids):
+        print("Appending centroids")
         self.to_ventilator.send_json({
-            "clusters" : clusters,
             "centroids" : centroids
         })
 
@@ -54,7 +53,6 @@ class Sink:
         # O pegando los clusters y centroides
         while True:
             distances = np.zeros((self.n_data, self.n_clusters))
-            clusters = []
             centroids = []
             for cluster in range(self.n_clusters):
                 msg = self.from_ventilator.recv_json()
@@ -63,13 +61,12 @@ class Sink:
                     distance = np.asarray(msg["distances"])
                     distances[:, cluster] = distance
                 elif msg["type"] == "clusters":
-                    clusters.append(msg["cluster"])
                     centroids.append(msg["centroid"])
 
             if msg["type"] == "distances":
                 self.sendTags(distances)   
             elif msg["type"] == "clusters":
-                self.sendClustersAndCentroids(clusters, centroids)
+                self.sendCentroids(centroids)
             self.to_ventilator.recv()
 
     def __init__(self, dir_sink, dir_ventilator):

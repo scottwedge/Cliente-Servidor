@@ -10,6 +10,8 @@ import zmq
 import numpy as np
 import argparse
 import time
+from sklearn.datasets import make_blobs
+
 class Sink:
 
     #Crea el socket donde le llega la informacion del 
@@ -23,45 +25,59 @@ class Sink:
         self.to_ventilator = self.context.socket(zmq.REQ)
         self.to_ventilator.connect(f"tcp://{self.dir_ventilator}")
 
-    #Funcion donde le llegara el mensaje del ventilator
-    def listen(self):
-        print("Ready")
+    def instanciateDataset(self):
+        #Creamos el dataset
+        self.x, self.y = make_blobs(n_samples = self.n_data, 
+                                n_features=self.n_features, 
+                                centers = self.n_clusters, 
+                                random_state=self.random_state)
+
+    def recieveFirstMessage(self):
         msg = self.from_ventilator.recv_json()
         self.n_data = msg["n_data"]
         self.n_clusters = msg["n_clusters"]
         self.n_features = msg["n_features"]
         self.opers = msg["opers"]
+        self.random_state = msg["random_state"]
         print("Recieve first message")
+        self.instanciateDataset()
 
-    
+    def calculateSizeClusters(self, y):
+        sizes = [0] * self.n_clusters
+        for tag in y:
+            sizes[tag] += 1
+        return sizes 
+
+    #Funcion donde le llegara el mensaje del ventilator
+    def listen(self):
+        print("Ready")
+        self.recieveFirstMessage()
         while True:
             #Inicializo la suma, los clusters y los tags
             sum_points = np.zeros((self.n_clusters, self.n_features))
-            clusters = []
-            [clusters.append([]) for i in range(self.n_clusters)]
             y = [0] * self.n_data
-
             for oper in range(self.opers):
                 msg = self.from_ventilator.recv_json()
                 y_temp = msg["tags"]
                 sum_points_temp = msg["sum_points"]
-                clusters_temp = msg["clusters"]
-                ini, fin = msg["position"]
+                ini, fin  = msg["position"]
+                y[ini:fin] = y_temp.copy() #Voy armando el vector de tags
                 for i in range(self.n_clusters):
-                    clusters[i].extend(clusters_temp[i]) #Pego los clusters
                     sum_points[i] += sum_points_temp[i] #Sumo los resultados de cada worker
-                    y[ini:fin] = y_temp #Voy armando el vector de tags
-                
+                        
+            
+            sizes = self.calculateSizeClusters(y)
             #Promedio la suma para encontrar la posicion del centroide
-            for i in range(self.n_clusters):
-                if len(clusters[i]) != 0:
-                    sum_points[i] = sum_points[i] / len(clusters[i])
+            for i, size in enumerate(sizes):
+                if size != 0:
+                    sum_points[i] = sum_points[i] / size
 
             print("Sending to fan")
+            
             self.to_ventilator.send_json({
-                "clusters" : clusters,
                 "centroids" : np.ndarray.tolist(sum_points),
-                "y" : y
+                "y" : y,
+                "sizes" : sizes
             })
             self.to_ventilator.recv()
 

@@ -8,8 +8,9 @@ import zmq
 import argparse 
 from scipy.spatial import distance
 import numpy as np
-class Worker:
+from sklearn.datasets import make_blobs
 
+class Worker:
     def calculateDistances(self, centroid):
         #Calcula la distancia entre todos los puntos y un centroide dado
         distances = []
@@ -32,13 +33,21 @@ class Worker:
             centroid = [0]*self.n_features
         return centroid
 
-    def recieveInitialData(self):
+    def instanciateDataset(self, random_state):
+        self.data, self.y = make_blobs(n_samples = self.n_data, 
+                                n_features=self.n_features, 
+                                centers = self.n_clusters, 
+                                random_state=random_state)
+
+    def recieveInitialData(self, msg):
         #Recibe el dataset entero para no recibirlo muchas veces
-        msg = self.from_ventilator.recv_json()
-        self.data = np.asarray(msg["data"])
+        self.n_clusters = msg["n_clusters"]
         self.n_features = msg["n_features"]
+        self.n_data = msg["n_data"]
+        random_state = msg["random_state"]
         print("Recieved first message")
-        self.n_data = self.data.shape[0]
+        self.instanciateDataset(random_state)
+
 
     def sendDistances(self, msg):
         #Envia las distancias calculadas al sink
@@ -63,13 +72,11 @@ class Worker:
         self.to_sink.send_json({
             "type" : "clusters",
             "centroid" : centroid,
-            "cluster" : cluster
         })
 
     def listen(self): 
         print("Ready")
         #Ciclo en el que recibe los dos arrays y los multiplica
-        self.recieveInitialData()
         while True:
             msg = self.from_ventilator.recv_json()
             oper = msg["operation"]
@@ -79,7 +86,8 @@ class Worker:
 
             elif oper == "move_centroid":
                 self.sendClusterAndCentroid(msg)
-
+            elif oper == "new_dataset":
+                self.recieveInitialData(msg)
 
     def createSockets(self):
         self.context = zmq.Context()

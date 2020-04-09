@@ -4,6 +4,7 @@ from utilsKmeans import *
 import zmq
 import matplotlib.pyplot as plt
 import argparse
+import time
 """
 En esta aproximacion, el ventilator:
 1.Instancia los centroides
@@ -19,6 +20,12 @@ En esta aproximacion, el ventilator:
 """
 
 class Ventilator:
+
+    n_data = 1932
+    max_iters = 1000
+    chunk_worker = 100
+    random_state  = np.random.randint(0, 100)
+    #random_state  = 10
 
 
     def createSockets(self):
@@ -36,8 +43,9 @@ class Ventilator:
     def instanciateDataset(self):
         #Creamos el dataset
         self.x, self.y = make_blobs(n_samples = self.n_data, 
-                                n_features=self.n_features, 
-                                centers = self.n_clusters)
+                                n_features = self.n_features, 
+                                centers = self.n_clusters, 
+                                random_state = self.random_state)
         
         if self.n_features == 2:
             plt.scatter(self.x[:, 0], self.x[:, 1])
@@ -60,30 +68,32 @@ class Ventilator:
         self.centroids = []
         for i in range(self.n_clusters):
             centroid = [] 
-            for j, min_max in enumerate(mins_max):
+            for min_max in mins_max:
                 centroid.append(np.random.uniform(low = min_max[0], high = min_max[1]))
             self.centroids.append(centroid)
         
-    def showResult(self, clusters):
+    def showResult(self):
         #Muestra los puntos asignados a cada cluster y si el numero de
         #features es de 2, mostrara la grafica
-        for i, c in enumerate(clusters):
+        for i, c in enumerate(self.clusters):
             print(f"\tCLUSTER{i+1}")
             [print(point) for point in c]
         
         if self.n_features == 2:
-            show(clusters, self.centroids)
+            show(self.clusters, self.centroids)
 
     def sendInitialData(self):
+        i = 0 
         #Para no enviarle el dataset en cada iteracion. 
-        #data_list = np.ndarray.tolist(self.x)
-        # for i in range(self.n_clusters):
-        #     self.to_workers.send_json({
-        #         "data" : data_list,
-        #         "n_features" : self.n_features,
-        #         "n_clusters" : self.n_clusters
-        #         "position" : []
-        #     })
+        while i < self.n_data:
+            self.to_workers.send_json({
+                "action" : "new_dataset",
+                "random_state" : self.random_state,
+                "n_features" : self.n_features,
+                "n_clusters" : self.n_clusters, 
+                "n_data" : self.n_data,
+            })
+            i += self.chunk_worker
 
         #Calculando el numero de operaciones que se haran
         #para decirle al sink lo que debe esperar
@@ -95,33 +105,32 @@ class Ventilator:
             "n_data" : self.n_data,
             "n_clusters" : self.n_clusters,
             "n_features" : self.n_features,
-            "opers" : opers
+            "opers" : opers, 
+            "random_state" : self.random_state
         })
-
-    def isEmptyCluster(self, clusters):
-        #Verificamos si algun cluster quedo vacio
-        empty = False
-        i = 0
-        while not empty and i < len(clusters):
-            if len(clusters[i]) == 0:
-                print("Empty cluster!")
-                empty = True
-            i += 1
-        return empty
-    
 
     def sendCalculateDistance(self):
         #Los workers calculan la distancia de un numero determinado
         # de puntos punto a todos los  cluster
         i = 0
         while i < self.n_data:
+            i_max = i + self.chunk_worker 
+            if i_max > self.n_data:
+                i_max = self.n_data
             self.to_workers.send_json({
-                "centroids" : self.centroids,
-                "points" : np.ndarray.tolist(self.x[i: i + self.chunk_worker]),
-                "position" : [i, i+self.chunk_worker]
+                "action" : "operate",
+                "centroids" : self.centroids, 
+                "position" : [i, i_max]
             })
             i += self.chunk_worker
     
+    def createClusters(self):
+        self.clusters = []
+        [self.clusters.append([]) for i in range(self.n_clusters)]
+        for i in range(self.n_data):
+            self.clusters[self.y[i]].append(self.x[i])
+
+
     def kmeans(self):
         #Metodo k_means paralelizado.
         input("Press enter when workers are ready")
@@ -146,12 +155,11 @@ class Ventilator:
             result = self.from_sink.recv_json()
             self.from_sink.send(b" ")
 
+            size_clusters = result["sizes"]
             y_new = result["y"]
-            clusters = result["clusters"]
             self.centroids = result["centroids"]
 
-            lens = [len(cluster) for cluster in clusters]
-            print(sorted(lens))
+            print(sorted(size_clusters))
 
             #Si ningun punto ha cambiado de cluster paro de iterar
             if np.array_equal(self.y, np.asarray(y_new)):
@@ -160,11 +168,13 @@ class Ventilator:
                 self.y = y_new.copy()
                 #Volvemos a incializar los clusters hasta que todos 
                 # tengan al menos un elemento
-                empty_cluster = self.isEmptyCluster(clusters)
-                if empty_cluster:
+                if np.min(np.asarray(size_clusters)) == 0:
+                    print("Empty clusters")
                     self.createCentroids(mins_max)
 
-        self.showResult(clusters)
+        self.createClusters()
+        self.showResult()
+    
 
 
             
@@ -173,9 +183,7 @@ class Ventilator:
         self.n_clusters = n_clusters
         self.n_features = n_features
 
-        self.n_data = 1010
-        self.max_iters = 1000
-        self.chunk_worker = 100
+        
 
         self.instanciateDataset()
         
