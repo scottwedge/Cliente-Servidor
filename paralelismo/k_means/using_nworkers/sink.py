@@ -11,7 +11,8 @@ import numpy as np
 import argparse
 import time
 from sklearn.datasets import make_blobs
-
+from os.path import join 
+import pandas as pd 
 class Sink:
 
     #Crea el socket donde le llega la informacion del 
@@ -25,22 +26,13 @@ class Sink:
         self.to_ventilator = self.context.socket(zmq.REQ)
         self.to_ventilator.connect(f"tcp://{self.dir_ventilator}")
 
-    def instanciateDataset(self):
-        #Creamos el dataset
-        self.x, self.y = make_blobs(n_samples = self.n_data, 
-                                n_features=self.n_features, 
-                                centers = self.n_clusters, 
-                                random_state=self.random_state)
-
     def recieveFirstMessage(self):
         msg = self.from_ventilator.recv_json()
-        self.n_data = msg["n_data"]
         self.n_clusters = msg["n_clusters"]
+        self.n_data = msg["n_data"]
         self.n_features = msg["n_features"]
         self.opers = msg["opers"]
-        self.random_state = msg["random_state"]
         print("Recieve first message")
-        self.instanciateDataset()
 
     def calculateSizeClusters(self, y):
         sizes = [0] * self.n_clusters

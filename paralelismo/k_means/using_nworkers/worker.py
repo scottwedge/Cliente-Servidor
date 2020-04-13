@@ -10,27 +10,28 @@ import argparse
 from scipy.spatial import distance
 import numpy as np
 from sklearn.datasets import make_blobs
+import pandas as pd
+from os.path import join 
 
 class Worker:
 
-    def instanciateDataset(self):
-        #Creamos el dataset
-        self.x, self.y = make_blobs(n_samples = self.n_data, 
-                                n_features=self.n_features, 
-                                centers = self.n_clusters, 
-                                random_state=self.random_state)
-        
+    def instanciateDataset(self, has_tags):
+        #Abre el dataset con la ayuda de pandas
+        data = pd.read_csv(join("datasets", self.name_dataset))
+        if has_tags:
+            self.x = data.values[:, :-1]
+        else:
+            self.x = data.values
 
+        self.n_data, self.n_features = self.x.shape
 
     def recieveInitialData(self, msg):
         #Por ahora no se usa, ya que como no se cuantos workers tengo
         #no puedo enviar el data set al inicio
-        self.n_data = msg["n_data"]
-        self.n_features = msg["n_features"]
+        self.name_dataset = msg["name_dataset"]
         self.n_clusters = msg["n_clusters"]
-        self.random_state = int(msg["random_state"])
         print("Recieved first message")
-        self.instanciateDataset()
+        self.instanciateDataset(msg["has_tags"])
 
 
     def calculateDistances(self, centroids):

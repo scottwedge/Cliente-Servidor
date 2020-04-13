@@ -5,6 +5,8 @@ import zmq
 import matplotlib.pyplot as plt
 import argparse
 import time
+import pandas as pd 
+from os.path import join
 """
 En esta aproximacion, el ventilator:
 1.Instancia los centroides
@@ -40,15 +42,17 @@ class Ventilator:
         self.from_sink = self.context.socket(zmq.REP)
         self.from_sink.bind(f"tcp://{self.my_dir_sink}")
 
-    #Existen dos tipos de datasets, el generado automaticamente o 
-    #el que esta en un csv 
-    def instanciateDataset(self, type_of_dataset = "generated"):
-        #Creamos el dataset
-        self.x, self.y = make_blobs(n_samples = self.n_data, 
-                                n_features = self.n_features, 
-                                centers = self.n_clusters, 
-                                random_state = self.random_state)
-        
+    
+    def instanciateDataset(self):
+        #Abre el dataset con la ayuda de pandas
+        data = pd.read_csv(join("datasets", self.name_dataset))
+        if self.has_tags:
+            self.x = data.values[:, :-1]
+        else:
+            self.x = data.values
+
+        self.n_data, self.n_features = self.x.shape
+
         if self.n_features == 2:
             plt.scatter(self.x[:, 0], self.x[:, 1])
             plt.show()
@@ -90,10 +94,9 @@ class Ventilator:
         while i < self.n_data:
             self.to_workers.send_json({
                 "action" : "new_dataset",
-                "random_state" : self.random_state,
-                "n_features" : self.n_features,
-                "n_clusters" : self.n_clusters, 
-                "n_data" : self.n_data,
+                "name_dataset" : self.name_dataset,
+                "n_clusters" : self.n_clusters,
+                "has_tags" : self.has_tags 
             })
             i += self.chunk_worker
 
@@ -104,11 +107,10 @@ class Ventilator:
             opers += 1
 
         self.to_sink.send_json({
-            "n_data" : self.n_data,
             "n_clusters" : self.n_clusters,
-            "n_features" : self.n_features,
-            "opers" : opers, 
-            "random_state" : self.random_state
+            "n_features" : self.n_features, 
+            "n_data" : self.n_data, 
+            "opers" : opers
         })
 
     def sendCalculateDistance(self):
@@ -175,19 +177,18 @@ class Ventilator:
                     print("Empty clusters")
                     self.createCentroids(mins_max)
 
-        self.createClusters()
-        self.showResult()
+        print("END")
+        #self.createClusters()
+        #self.showResult()
     
 
 
             
-    def __init__(self, n_clusters, n_features, 
-                    my_dir, my_dir_sink, dir_sink):
+    def __init__(self, name_dataset, has_tags, 
+                    my_dir, my_dir_sink, dir_sink, n_clusters):
+        self.name_dataset = name_dataset
         self.n_clusters = n_clusters
-        self.n_features = n_features
-
-        
-
+        self.has_tags = has_tags
         self.instanciateDataset()
         
         self.my_dir = my_dir
@@ -202,12 +203,13 @@ def createConsole():
     console.add_argument("my_dir", type=str)
     console.add_argument("my_dir2", type=str)
     console.add_argument("dir_sink", type=str)
+    console.add_argument("name_file", type=str)
     console.add_argument("n_clusters", type=int)
-    console.add_argument("n_features", type=int)
+    console.add_argument("-t", "--tags", action="store_true")
     return console.parse_args()
 
 if __name__ == "__main__":
     args = createConsole()
-    ventilator = Ventilator(args.n_clusters, args.n_features, 
-                            args.my_dir, args.my_dir2, args.dir_sink)
+    ventilator = Ventilator(args.name_file, args.tags,  args.my_dir, 
+                            args.my_dir2, args.dir_sink, args.n_clusters)
     ventilator.kmeans()
