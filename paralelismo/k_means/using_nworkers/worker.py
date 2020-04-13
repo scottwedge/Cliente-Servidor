@@ -75,7 +75,6 @@ class Worker:
 
                 self.min, self.max = msg["position"]
         
-                operating = True
                 print("Calculating distance")
                 centroids = msg["centroids"]
 

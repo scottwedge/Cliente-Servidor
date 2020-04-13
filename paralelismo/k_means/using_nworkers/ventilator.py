@@ -40,7 +40,9 @@ class Ventilator:
         self.from_sink = self.context.socket(zmq.REP)
         self.from_sink.bind(f"tcp://{self.my_dir_sink}")
 
-    def instanciateDataset(self):
+    #Existen dos tipos de datasets, el generado automaticamente o 
+    #el que esta en un csv 
+    def instanciateDataset(self, type_of_dataset = "generated"):
         #Creamos el dataset
         self.x, self.y = make_blobs(n_samples = self.n_data, 
                                 n_features = self.n_features, 
@@ -145,6 +147,7 @@ class Ventilator:
         iters = 0
         while changing and iters < self.max_iters:
             iters += 1
+            print("Iters", iters)
             print("Operating")
 
             self.sendCalculateDistance()
