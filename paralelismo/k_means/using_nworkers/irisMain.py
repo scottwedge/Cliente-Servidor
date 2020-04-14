@@ -17,7 +17,7 @@ if __name__ == "__main__":
         clusters.append([0, 0, 0])
     print(clusters)
     for i, tag in enumerate(tags_pred):
-2        if tags_true[i][0] == "Setosa":
+        if tags_true[i][0] == "Setosa":
             clusters[tag][0] += 1
         elif tags_true[i][0] == "Versicolor":
             clusters[tag][1] += 1

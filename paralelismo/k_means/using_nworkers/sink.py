@@ -32,6 +32,7 @@ class Sink:
         self.n_data = msg["n_data"]
         self.n_features = msg["n_features"]
         self.opers = msg["opers"]
+        self.chunk = msg["chunk"]
         print("Recieve first message")
 
     def calculateSizeClusters(self, y):
@@ -52,7 +53,10 @@ class Sink:
                 msg = self.from_ventilator.recv_json()
                 y_temp = msg["tags"]
                 sum_points_temp = msg["sum_points"]
-                ini, fin  = msg["position"]
+                ini = msg["position"]
+                fin = ini + self.chunk
+                if fin > self.n_data:
+                    fin = self.n_data
                 y[ini:fin] = y_temp.copy() #Voy armando el vector de tags
                 for i in range(self.n_clusters):
                     sum_points[i] += sum_points_temp[i] #Sumo los resultados de cada worker

@@ -15,30 +15,30 @@ from os.path import join
 
 class Worker:
 
-    def instanciateDataset(self, has_tags):
-        #Abre el dataset con la ayuda de pandas
-        data = pd.read_csv(join("datasets", self.name_dataset))
-        if has_tags:
-            self.x = data.values[:, :-1]
+    def readPartDataset(self, ini):
+        data = pd.read_csv(join("datasets", self.name_dataset), 
+                            skiprows=ini, nrows=self.chunk)
+        if self.has_tags:
+            values = data.values[:, :-1]
         else:
-            self.x = data.values
-        self.x = self.x.astype(np.float)
-        self.n_data, self.n_features = self.x.shape
+            values = data.values     
+        values = values.astype(float)   
+        return values
 
     def recieveInitialData(self, msg):
         #Por ahora no se usa, ya que como no se cuantos workers tengo
         #no puedo enviar el data set al inicio
         self.name_dataset = msg["name_dataset"]
         self.n_clusters = msg["n_clusters"]
+        self.n_features = msg["n_features"]
+        self.chunk = msg["chunk"]
         print("Recieved first message")
-        self.instanciateDataset(msg["has_tags"])
+        self.has_tags  = msg["has_tags"]
 
 
-    def calculateDistances(self, centroids):
+    def calculateDistances(self, centroids, points):
         #Calcula la distancia entre todos los puntos y un centroide dado
         #Matriz de tamanio data * centroids
-        
-        points = self.x[self.min : self.max]
         distances = []
         for p in (points):
             distance_point = []
@@ -48,7 +48,7 @@ class Worker:
         return distances
     
     
-    def calculateTagsAndSum(self, distances):
+    def calculateTagsAndSum(self, distances, points):
         #A partir de las distancias anteriormente calculadas, crea 
         #los clusters y los tags, ademas de sumar los puntos de cada
         #cluster para que luego el sink los pueda promediar
@@ -56,12 +56,10 @@ class Worker:
         y = []
         #Inicializo los clusters vacios
         sum_points = np.zeros((self.n_clusters, self.n_features))
-        index = 0
-        for i in range(self.min, self.max):
-            index_min = int(np.argmin(distances[index]))
+        for i in range(len(points)):
+            index_min = int(np.argmin(distances[i]))
             y.append(index_min) #Tags
-            sum_points[index_min] += self.x[i] #Suma de los puntos
-            index += 1
+            sum_points[index_min] += points[i] #Suma de los puntos
         return (y, sum_points)
 
 
@@ -73,18 +71,16 @@ class Worker:
             if msg["action"] == "new_dataset":
                     self.recieveInitialData(msg)
             else:
-
-                self.min, self.max = msg["position"]
-        
+                ini = msg["position"]
                 print("Calculating distance")
                 centroids = msg["centroids"]
-
-                distances = self.calculateDistances(centroids)
-                tags, sum_points = self.calculateTagsAndSum(distances)
+                points = self.readPartDataset(ini)
+                distances = self.calculateDistances(centroids, points)
+                tags, sum_points = self.calculateTagsAndSum(distances, points)
                 self.to_sink.send_json({
                     "tags" : tags,
                     "sum_points" : np.ndarray.tolist(sum_points), 
-                    "position" : [self.min, self.max]
+                    "position" : ini
                 })
 
 

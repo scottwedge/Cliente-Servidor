@@ -25,7 +25,7 @@ class Ventilator:
 
     n_data = 1932
     max_iters = 1000
-    chunk_worker = 100
+    chunk_worker = 10
     random_state  = np.random.randint(0, 100)
     #random_state  = 10
 
@@ -43,41 +43,46 @@ class Ventilator:
         self.from_sink.bind(f"tcp://{self.my_dir_sink}")
 
     
+
+    def readPartDataset(self, i):
+        data = pd.read_csv(join("datasets", self.name_dataset), 
+                            skiprows=i, nrows=self.chunk_worker)
+        if self.has_tags:
+            values = data.values[:, :-1]
+        else:
+            values = data.values        
+        reading = values.shape[0] == self.chunk_worker
+        return values, reading 
+
+
     def instanciateDataset(self):
         #Abre el dataset con la ayuda de pandas
-        data = pd.read_csv(join("datasets", self.name_dataset))
-        if self.has_tags:
-            self.x = data.values[:, :-1]
-        else:
-            self.x = data.values
+        self.n_data = 0
+        i = 0
+        reading = True
+        while reading:
+            values, reading = self.readPartDataset(i)
+            if i == 0:
+                self.n_features = values.shape[1]
 
-        self.x = self.x.astype(np.float)
-        self.n_data, self.n_features = self.x.shape
+            self.n_data += values.shape[0]
+            if reading and self.n_features == 2:
+                plt.scatter(values[:, 0], values[:, 1], c = "salmon")
+            i += self.chunk_worker
+        plt.show()
 
-        if self.n_features == 2:
-            plt.scatter(self.x[:, 0], self.x[:, 1])
-            plt.show()
-
-    def calculateMinMaxFeatures(self):
-        #Calcula el minimo y el maximo de cada atributo para asi
-        #inicializar el centroide 
-        mins_max = []
-        for i in range(self.n_features):
-            min_f = np.min(self.x[:, i])
-            max_f = np.max(self.x[:, i])
-            mins_max.append((min_f, max_f))
-        return mins_max
-
-
-    def createCentroids(self, mins_max):
+    def createCentroids(self):
         #Creamos los centroides de manera aleatoria en el rango de cada 
         #caracteristica
         self.centroids = []
         for i in range(self.n_clusters):
-            centroid = [] 
-            for min_max in mins_max:
-                centroid.append(np.random.uniform(low = min_max[0], high = min_max[1]))
-            self.centroids.append(centroid)
+            number = np.random.randint(0, high=self.n_data)
+            value = pd.read_csv(join("datasets", self.name_dataset), 
+                                skiprows=number, nrows=1).values
+            if self.has_tags:
+                value = value[:, :-1]
+            value = np.ndarray.tolist(value.astype(float))
+            self.centroids.append(value)
         
     def showResult(self):
         #Muestra los puntos asignados a cada cluster y si el numero de
@@ -97,7 +102,9 @@ class Ventilator:
                 "action" : "new_dataset",
                 "name_dataset" : self.name_dataset,
                 "n_clusters" : self.n_clusters,
-                "has_tags" : self.has_tags 
+                "n_features" : self.n_features,
+                "has_tags" : self.has_tags,
+                "chunk" : self.chunk_worker
             })
             i += self.chunk_worker
 
@@ -111,7 +118,8 @@ class Ventilator:
             "n_clusters" : self.n_clusters,
             "n_features" : self.n_features, 
             "n_data" : self.n_data, 
-            "opers" : opers
+            "opers" : opers,
+            "chunk" : self.chunk_worker
         })
 
     def sendCalculateDistance(self):
@@ -125,16 +133,22 @@ class Ventilator:
             self.to_workers.send_json({
                 "action" : "operate",
                 "centroids" : self.centroids, 
-                "position" : [i, i_max]
+                "position" : i
             })
             i += self.chunk_worker
     
     def createClusters(self):
         self.clusters = []
         [self.clusters.append([]) for i in range(self.n_clusters)]
-        for i in range(self.n_data):
-            self.clusters[self.y[i]].append(self.x[i])
 
+        i = 0
+        reading = True
+        while reading:
+            data, reading = self.readPartDataset(i)
+            if len(data) != 0:
+                for j in range(len(data)):
+                    self.clusters[self.y[i+j]].append(data[j])
+            i += self.chunk_worker
 
     def kmeans(self):
         #Metodo k_means paralelizado.
@@ -142,8 +156,7 @@ class Ventilator:
         self.sendInitialData()
         #Creo los centroides de manera aleatoria en el rango 
         #de cada dimension de los puntos
-        mins_max = self.calculateMinMaxFeatures() 
-        self.createCentroids(mins_max)
+        self.createCentroids()
 
         self.y =  np.zeros(self.n_data)
         changing = True
@@ -172,15 +185,10 @@ class Ventilator:
                 changing = False
             else:
                 self.y = y_new.copy()
-                #Volvemos a incializar los clusters hasta que todos 
-                # tengan al menos un elemento
-                if np.min(np.asarray(size_clusters)) == 0:
-                    print("Empty clusters")
-                    self.createCentroids(mins_max)
 
         print("END")
-        #self.createClusters()
-        #self.showResult()
+        self.createClusters()
+        self.showResult()
     
 
 
