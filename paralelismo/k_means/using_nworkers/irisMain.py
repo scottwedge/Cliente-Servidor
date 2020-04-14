@@ -8,7 +8,7 @@ if __name__ == "__main__":
                             "127.0.0.1:5556", 
                             "127.0.0.1:5557", 
                             3)
-    tags_true = pd.read_csv(join("datasets", "iris.csv"), usecols=["variety"]).values
+    tags_true = pd.read_csv(join("datasets", "iris_normalized.csv"), usecols=["variety"]).values
     ventilator.kmeans()
     
     tags_pred = ventilator.y

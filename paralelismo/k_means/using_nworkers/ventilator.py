@@ -22,7 +22,6 @@ En esta aproximacion, el ventilator:
 """
 
 class Ventilator:
-
     n_data = 1932
     max_iters = 1000
     chunk_worker = 10
@@ -219,6 +218,7 @@ def createConsole():
 
 if __name__ == "__main__":
     args = createConsole()
-    ventilator = Ventilator(args.name_file, args.tags,  args.my_dir, 
-                            args.my_dir2, args.dir_sink, args.n_clusters)
+    ventilator = Ventilator(args.name_file, args.tags,
+                            args.my_dir, args.my_dir2, args.dir_sink, 
+                            args.n_clusters)
     ventilator.kmeans()
