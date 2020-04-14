@@ -51,6 +51,7 @@ class Ventilator:
         else:
             self.x = data.values
 
+        self.x = self.x.astype(np.float)
         self.n_data, self.n_features = self.x.shape
 
         if self.n_features == 2:

@@ -22,7 +22,7 @@ class Worker:
             self.x = data.values[:, :-1]
         else:
             self.x = data.values
-
+        self.x = self.x.astype(np.float)
         self.n_data, self.n_features = self.x.shape
 
     def recieveInitialData(self, msg):
