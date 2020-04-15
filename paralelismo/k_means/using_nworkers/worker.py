@@ -12,6 +12,8 @@ import numpy as np
 from sklearn.datasets import make_blobs
 import pandas as pd
 from os.path import join 
+from utils import *
+
 
 class Worker:
 
@@ -32,9 +34,9 @@ class Worker:
         self.n_clusters = msg["n_clusters"]
         self.n_features = msg["n_features"]
         self.chunk = msg["chunk"]
+        self.distance_metric = msg["distance_metric"]
         print("Recieved first message")
         self.has_tags  = msg["has_tags"]
-
 
     def calculateDistances(self, centroids, points):
         #Calcula la distancia entre todos los puntos y un centroide dado
@@ -43,7 +45,10 @@ class Worker:
         for p in (points):
             distance_point = []
             for centroid in centroids:
-                distance_point.append(distance.euclidean(p, centroid))
+                if self.distance_metric == "euclidean":
+                    distance_point.append(distance.euclidean(p, centroid))
+                elif self.distance_metric == "angular":
+                    distance_point.append(cosineSimilarity(p, centroid))
             distances.append(distance_point)
         return distances
     

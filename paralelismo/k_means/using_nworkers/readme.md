@@ -7,7 +7,7 @@
 4. Nombre del dataset (debe estar en la carpeta datasets)
 6. Numero de clusters 
 5. Opcional: Si el dataset lleva tags se pone -t
-### python ventilator.py 127.0.0.1:5555 127.0.0.1:5556 127.0.0.1:5557 hola.csv  4 [-t]
+### python ventilator.py 127.0.0.1:5555 127.0.0.1:5556 127.0.0.1:5557 hola.csv  4 [-t] [euclidean|angular]
 
 ## Sink 
 1. Direccion del sink

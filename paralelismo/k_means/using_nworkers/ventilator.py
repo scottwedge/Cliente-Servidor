@@ -1,12 +1,12 @@
 from sklearn.datasets import make_blobs
 import numpy as np
-from utilsKmeans import *
 import zmq
 import matplotlib.pyplot as plt
 import argparse
 import time
 import pandas as pd 
 from os.path import join
+import csv 
 """
 En esta aproximacion, el ventilator:
 1.Instancia los centroides
@@ -25,9 +25,7 @@ class Ventilator:
     n_data = 1932
     max_iters = 1000
     chunk_worker = 10
-    random_state  = np.random.randint(0, 100)
-    #random_state  = 10
-
+    tolerance = 0.01
 
     def createSockets(self):
         self.context = zmq.Context()
@@ -41,9 +39,10 @@ class Ventilator:
         self.from_sink = self.context.socket(zmq.REP)
         self.from_sink.bind(f"tcp://{self.my_dir_sink}")
 
-    
-
+        
     def readPartDataset(self, i):
+        #Lee una parte del dataset desde un 'i' dado, 
+        #si ya no existen mas datos indica que no hay mas que hacer
         data = pd.read_csv(join("datasets", self.name_dataset), 
                             skiprows=i, nrows=self.chunk_worker)
         if self.has_tags:
@@ -55,7 +54,8 @@ class Ventilator:
 
 
     def instanciateDataset(self):
-        #Abre el dataset con la ayuda de pandas
+        #Abre el dataset con la ayuda de pandas y de la funcion
+        #readPartDataset()
         self.n_data = 0
         i = 0
         reading = True
@@ -63,8 +63,8 @@ class Ventilator:
             values, reading = self.readPartDataset(i)
             if i == 0:
                 self.n_features = values.shape[1]
-
             self.n_data += values.shape[0]
+
             if reading and self.n_features == 2:
                 plt.scatter(values[:, 0], values[:, 1], c = "salmon")
             i += self.chunk_worker
@@ -82,20 +82,32 @@ class Ventilator:
                 value = value[:, :-1]
             value = np.ndarray.tolist(value.astype(float))
             self.centroids.append(value)
-        
-    def showResult(self):
-        #Muestra los puntos asignados a cada cluster y si el numero de
-        #features es de 2, mostrara la grafica
-        for i, c in enumerate(self.clusters):
-            print(f"\tCLUSTER{i+1}")
-            [print(point) for point in c]
-        
-        if self.n_features == 2:
-            show(self.clusters, self.centroids)
+    
 
+    def showResult(self):
+        #Si tiene dos caracteristicas, abre el dataset por partes y lo 
+        #muestra solo al final 
+        colors = ["green", "blue", "red", "salmon", "skyblue", "tomatoe"]
+        reading = True 
+        i = 0
+        while reading:
+            data, reading = self.readPartDataset(i)
+            
+            if reading:
+                for j, p in enumerate(data):
+                    color = colors[(self.y[i + j] + 1) % len(colors)]
+                    plt.scatter(p[0], p[1], c = color)
+            i += self.chunk_worker
+
+        for c in self.centroids:
+            plt.scatter(c[0], c[1], c = "black", marker = "D")
+        
+        plt.show()
+            
     def sendInitialData(self):
         i = 0 
-        #Para no enviarle el dataset en cada iteracion. 
+        #Para no enviarle el dataset en cada iteracion, se le envia el nombre
+        #que ellos deben abrir 
         while i < self.n_data:
             self.to_workers.send_json({
                 "action" : "new_dataset",
@@ -103,7 +115,8 @@ class Ventilator:
                 "n_clusters" : self.n_clusters,
                 "n_features" : self.n_features,
                 "has_tags" : self.has_tags,
-                "chunk" : self.chunk_worker
+                "chunk" : self.chunk_worker,
+                "distance_metric" : self.distance_metric
             })
             i += self.chunk_worker
 
@@ -118,7 +131,7 @@ class Ventilator:
             "n_features" : self.n_features, 
             "n_data" : self.n_data, 
             "opers" : opers,
-            "chunk" : self.chunk_worker
+            "chunk" : self.chunk_worker,
         })
 
     def sendCalculateDistance(self):
@@ -136,18 +149,15 @@ class Ventilator:
             })
             i += self.chunk_worker
     
-    def createClusters(self):
-        self.clusters = []
-        [self.clusters.append([]) for i in range(self.n_clusters)]
-
-        i = 0
-        reading = True
-        while reading:
-            data, reading = self.readPartDataset(i)
-            if len(data) != 0:
-                for j in range(len(data)):
-                    self.clusters[self.y[i+j]].append(data[j])
-            i += self.chunk_worker
+    def writeTags(self):
+        #Escribe el vector y en un nuevo csv 
+        name_result = self.name_dataset.split(".")[0] + "_result.csv"
+        with open(join("datasets", name_result), 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(["tag"])
+            for tag in self.y:
+                writer.writerow([tag])
+            
 
     def kmeans(self):
         #Metodo k_means paralelizado.
@@ -179,22 +189,25 @@ class Ventilator:
 
             print(sorted(size_clusters))
 
+            falses = np.equal(self.y, np.asarray(y_new))
+            falses = np.sum(np.where(falses == False, 1, 0))
             #Si ningun punto ha cambiado de cluster paro de iterar
-            if np.array_equal(self.y, np.asarray(y_new)):
+            if falses*100.0/self.n_data < self.tolerance:
                 changing = False
             else:
                 self.y = y_new.copy()
 
         print("END")
-        self.createClusters()
-        self.showResult()
+        self.writeTags()
+
+        if self.n_features == 2:
+            self.showResult()
     
-
-
-            
-    def __init__(self, name_dataset, has_tags, 
-                    my_dir, my_dir_sink, dir_sink, n_clusters):
+    def __init__(self, name_dataset, has_tags, my_dir, 
+                    my_dir_sink, dir_sink, n_clusters, 
+                    distance_metric):
         self.name_dataset = name_dataset
+        self.distance_metric = distance_metric
         self.n_clusters = n_clusters
         self.has_tags = has_tags
         self.instanciateDataset()
@@ -213,6 +226,7 @@ def createConsole():
     console.add_argument("dir_sink", type=str)
     console.add_argument("name_file", type=str)
     console.add_argument("n_clusters", type=int)
+    console.add_argument("distance_metric", type=str)
     console.add_argument("-t", "--tags", action="store_true")
     return console.parse_args()
 
@@ -220,5 +234,5 @@ if __name__ == "__main__":
     args = createConsole()
     ventilator = Ventilator(args.name_file, args.tags,
                             args.my_dir, args.my_dir2, args.dir_sink, 
-                            args.n_clusters)
+                            args.n_clusters, args.distance_metric)
     ventilator.kmeans()

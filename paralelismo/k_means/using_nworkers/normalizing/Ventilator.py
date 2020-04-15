@@ -16,9 +16,6 @@ class Ventilator:
         self.to_workers = self.context.socket(zmq.PUSH)
         self.to_workers.bind(f"tcp://{self.my_dir}")
 
-        self.to_sink = self.context.socket(zmq.PUSH)
-        self.to_sink.connect(f"tcp://{self.dir_sink}")
-
         self.from_sink = self.context.socket(zmq.REP)
         self.from_sink.bind(f"tcp://{self.my_dir_sink}")
 
@@ -109,10 +106,9 @@ class Ventilator:
         self.from_sink.send(b" ")
 
 
-    def __init__(self, name_dataset, my_dir, my_dir_sink,  dir_sink, has_tags):
+    def __init__(self, name_dataset, my_dir,  my_dir_sink, has_tags):
         self.my_dir = my_dir
         self.my_dir_sink = my_dir_sink
-        self.dir_sink = dir_sink
         self.name_dataset = name_dataset
         self.has_tags = has_tags
         self.createSockets()
@@ -125,13 +121,12 @@ def createConsole():
     console.add_argument("name_dataset", type=str)
     console.add_argument("my_dir", type=str)
     console.add_argument("my_dir_sink", type=str)
-    console.add_argument("dir_sink", type=str)
     console.add_argument("--tags", "-t", action = "store_true")
     return console.parse_args()
 
 
 if __name__ == "__main__":
     args = createConsole()
-    ventilator = Ventilator(args.name_dataset, args.my_dir, args.my_dir_sink, 
-                            args.dir_sink, args.tags)
+    ventilator = Ventilator(args.name_dataset, args.my_dir, 
+                            args.my_dir_sink,  args.tags)
     ventilator.normalizeDataset()
