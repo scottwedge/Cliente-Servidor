@@ -7,6 +7,7 @@ import time
 import pandas as pd 
 from os.path import join
 import csv 
+from matplotlib.colors import TABLEAU_COLORS
 """
 En esta aproximacion, el ventilator:
 1.Instancia los centroides
@@ -22,9 +23,8 @@ En esta aproximacion, el ventilator:
 """
 
 class Ventilator:
-    n_data = 1932
     max_iters = 1000
-    chunk_worker = 10
+    chunk_worker = 100
     tolerance = 0.01
 
     def createSockets(self):
@@ -39,7 +39,11 @@ class Ventilator:
         self.from_sink = self.context.socket(zmq.REP)
         self.from_sink.bind(f"tcp://{self.my_dir_sink}")
 
-        
+    def closeSockets(self):
+        self.to_workers.unbind(f"tcp://{self.my_dir}")
+        self.to_sink.disconnect(f"tcp://{self.dir_sink}")
+        self.from_sink.unbind(f"tcp://{self.my_dir_sink}")
+
     def readPartDataset(self, i):
         #Lee una parte del dataset desde un 'i' dado, 
         #si ya no existen mas datos indica que no hay mas que hacer
@@ -68,7 +72,8 @@ class Ventilator:
             if reading and self.n_features == 2:
                 plt.scatter(values[:, 0], values[:, 1], c = "salmon")
             i += self.chunk_worker
-        plt.show()
+        if self.n_features == 2:
+            plt.show()
 
     def createCentroids(self):
         #Creamos los centroides de manera aleatoria en el rango de cada 
@@ -87,7 +92,10 @@ class Ventilator:
     def showResult(self):
         #Si tiene dos caracteristicas, abre el dataset por partes y lo 
         #muestra solo al final 
-        colors = ["green", "blue", "red", "salmon", "skyblue", "tomatoe"]
+
+        colors = []
+        for color in TABLEAU_COLORS:
+            colors.append(color.split(":")[-1])
         reading = True 
         i = 0
         while reading:
@@ -202,6 +210,8 @@ class Ventilator:
 
         if self.n_features == 2:
             self.showResult()
+        
+        self.closeSockets()
     
     def __init__(self, name_dataset, has_tags, my_dir, 
                     my_dir_sink, dir_sink, n_clusters, 

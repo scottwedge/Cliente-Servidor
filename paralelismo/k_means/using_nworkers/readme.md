@@ -30,3 +30,35 @@
 3. Número de caracteristicas 
 4. Número de muestras
 ### python createBlobs.py nombre.csv 3 2 1000
+
+# Elbow method 
+
+Este metodo se usa para calcular el k óptimo, lo que hace es sumar la distorsión 
+de todos los puntos con respecto a su cluster 
+
+## Para correrlo 
+
+Cabe recalcar que en cada iteracion el sink normal debe reiniciarse 
+
+### Ventilator elbow
+1. Direccion del ventilator para los workers
+2. Direccion del ventilator para el sink
+3. Direccion del sink
+4. Nombre del dataset (debe estar en la carpeta datasets)
+6. Número de clusters mínimo
+8. Número de clusters máximo
+5. Opcional: Si el dataset lleva tags se pone -t
+#### python ventilator_elbow.py 127.0.0.1:6565 127.0.0.1:6566 127.0.0.1:6567 hola.csv  2 6 [-t] [euclidean|angular]
+
+### Sink  elbow
+1. Direccion del sink
+2. Direccion correspondiente del ventilator
+
+#### python sink_elbow.py 127.0.0.1:6567 127.0.0.1:6566
+
+### Worker elbow
+
+1. Direccion correspondiente del ventilator
+2. Direccion del sink 
+
+#### python worker_elbow.py 127.0.0.1:6565 127.0.0.1:6567

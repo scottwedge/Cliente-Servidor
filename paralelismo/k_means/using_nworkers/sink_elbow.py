@@ -26,59 +26,28 @@ class Sink:
         self.to_ventilator = self.context.socket(zmq.REQ)
         self.to_ventilator.connect(f"tcp://{self.dir_ventilator}")
 
+
     def recieveFirstMessage(self):
         msg = self.from_ventilator.recv_json()
-        self.n_clusters = msg["n_clusters"]
-        self.n_data = msg["n_data"]
-        self.n_features = msg["n_features"]
-        self.opers = msg["opers"]
-        self.chunk = msg["chunk"]
+        self.iters = msg["iters"] #Numero de veces que se corre el kmeans
+        self.opers = msg["opers"] #Numero de tareas paralelizadas para calcular 
+                                  #la distorsion en cada momento que se corre kmeans
         print("Recieve first message")
-
-    def calculateSizeClusters(self, y):
-        sizes = [0] * self.n_clusters
-        for tag in y:
-            sizes[tag] += 1
-        return sizes 
 
     #Funcion donde le llegara el mensaje del ventilator
     def listen(self):
         print("Ready")
         self.recieveFirstMessage()
 
-        #Lo meto en un while true porque no se cuantas iteraciones puede 
-        #llegar a realizar kmeans, por lo que siempre debe estar 
-        #disponible
-        while True:
+        for iter in range(self.iters):
             #Inicializo la suma, los clusters y los tags
-            sum_points = np.zeros((self.n_clusters, self.n_features))
-            y = [0] * self.n_data
+            distorsion = 0
             for oper in range(self.opers):
-                msg = self.from_ventilator.recv_json()
-                y_temp = msg["tags"]
-                sum_points_temp = msg["sum_points"]
-                ini = msg["position"]
-                fin = ini + self.chunk
-                if fin > self.n_data:
-                    fin = self.n_data
-                y[ini:fin] = y_temp.copy() #Voy armando el vector de tags
-                for i in range(self.n_clusters):
-                    sum_points[i] += sum_points_temp[i] #Sumo los resultados de cada worker
-                        
-            
-            sizes = self.calculateSizeClusters(y)
-            #Promedio la suma para encontrar la posicion del centroide
-            for i, size in enumerate(sizes):
-                if size != 0:
-                    sum_points[i] = sum_points[i] / size
+                distorsion += float(self.from_ventilator.recv_string())
 
             print("Sending to fan")
             
-            self.to_ventilator.send_json({
-                "centroids" : np.ndarray.tolist(sum_points),
-                "y" : y,
-                "sizes" : sizes
-            })
+            self.to_ventilator.send_string(str(distorsion))
             self.to_ventilator.recv()
 
     def __init__(self, dir_sink, dir_ventilator):
