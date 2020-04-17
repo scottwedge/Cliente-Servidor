@@ -5,9 +5,12 @@
 2. Direccion del ventilator para el sink
 3. Direccion del sink
 4. Nombre del dataset (debe estar en la carpeta datasets)
-6. Numero de clusters 
-5. Opcional: Si el dataset lleva tags se pone -t
-### python ventilator.py 127.0.0.1:5555 127.0.0.1:5556 127.0.0.1:5557 hola.csv  4 [-t] [euclidean|angular]
+5. Numero de datos del dataset
+6. Numero de features del dataset
+7. Numero de clusters 
+8. Opcional: Si el dataset lleva tags se pone -t
+9. Tipo de distancia que usara el algoritmo
+### python ventilator.py 127.0.0.1:5555 127.0.0.1:5556 127.0.0.1:5557 hola.csv 1000 2 4 [-t] [euclidean|angular]
 
 ## Sink 
 1. Direccion del sink
@@ -40,17 +43,19 @@ de todos los puntos con respecto a su cluster
 
 Cabe recalcar que:
 * Debe estar corriendo el kmeans paralelizado normal con sus workers y sink
-* En cada iteracion, cuando se cambia el numero de clsters, el sink normal debe reiniciarse 
 
 ### Ventilator elbow
 1. Direccion del ventilator para los workers
 2. Direccion del ventilator para el sink
 3. Direccion del sink
 4. Nombre del dataset (debe estar en la carpeta datasets)
-6. Número de clusters mínimo
+5. Numero de datos del dataset
+6. Numero de features del dataset
+7. Número de clusters mínimo
 8. Número de clusters máximo
-5. Opcional: Si el dataset lleva tags se pone -t
-#### python ventilator_elbow.py 127.0.0.1:6565 127.0.0.1:6566 127.0.0.1:6567 hola.csv  2 6 [-t] [euclidean|angular]
+9. Opcional: Si el dataset lleva tags se pone -t
+10. Tipo de distancia que usara el metodo k means
+#### python ventilator_elbow.py 127.0.0.1:6565 127.0.0.1:6566 127.0.0.1:6567 hola.csv 1000 2 2 6 [-t] [euclidean|angular]
 
 ### Sink  elbow
 1. Direccion del sink

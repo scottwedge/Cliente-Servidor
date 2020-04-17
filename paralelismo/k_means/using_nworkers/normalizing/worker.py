@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import os 
 import argparse
+import csv 
 
 class Worker:
 
@@ -19,68 +20,97 @@ class Worker:
         self.to_sink = self.context.socket(zmq.PUSH)
         self.to_sink.connect(f"tcp://{self.dir_sink}")
 
- 
+
+    def readPartDataset(self, skiprows, returnTags = False):
+        data = pd.read_csv(os.path.join(self.datasets_path, self.name_dataset),
+                                skiprows=skiprows, nrows=self.chunk).values
+        if self.has_tags:
+            data_x = data[:, :-1]
+        else:
+            data_x = data
+
+        if not returnTags:
+            return data_x
+        
+        data_y = np.ndarray.tolist(data[:, -1])
+        return data_x, data_y
+        
+    def recieveInitialData(self, msg):
+        print("Initial data recieved")
+        self.name_normalized = msg["name_normalized"]
+        self.name_dataset = msg["name_dataset"]
+        self.has_tags = msg["has_tags"]
+        self.chunk = msg["chunk"]
+        
+    def sendMedia(self, msg):
+        skiprows = msg["skiprows"]
+        points = self.readPartDataset(skiprows)
+        sum_points = np.ndarray.tolist(np.sum(points, axis = 0))
+        n_elements = points.shape[0]
+        print("Sending sum to sink")
+        self.to_sink.send_json({
+            "action" : "media",
+            "sum_points" : sum_points, 
+            "n_elements" : n_elements
+        })
+
+    def sendDesvesta(self, msg):
+        skiprows = msg["skiprows"]
+        points = self.readPartDataset(skiprows)
+        media = np.asarray(msg["media"])
+        sum_points = np.sum((points-media)**2, axis = 0)
+        sum_points = np.ndarray.tolist(sum_points)
+        print("Sending sum desvesta to sink")
+        self.to_sink.send_json({
+            "action" : "desvesta",
+            "sum_points" : sum_points, 
+        })
+    
+    def normalizePoints(self, msg):
+        media = np.asarray(msg["media"])
+        desvesta = np.asarray(msg["desvesta"])
+
+        skiprows = msg["skiprows"]
+        if self.has_tags:
+            points, tags = self.readPartDataset(skiprows, returnTags = True)
+        else:
+            points = self.readPartDataset(skiprows)
+        
+        points = points.astype(np.float)
+        media = media.astype(np.float)
+        desvesta = desvesta.astype(np.float)
+        points = (points - media)/desvesta
+
+        with open(os.path.join(self.datasets_path, self.name_normalized), "a") as f:
+            writer = csv.writer(f)
+            if self.has_tags:
+                for (p, t) in zip(points, tags):
+                    writer.writerow(np.append(p, t))
+            else:
+                for p in points:
+                    writer.writerow(p)
+
+        print("Sending end normalize sink")
+        self.to_sink.send_json({
+            "action" : "end_normalize",
+        })
+
+        
 
     def listen(self):
         print("ready")
         while True:
             msg = self.from_ventilator.recv_json()
             action = msg["action"]
+
             if action == "media":
-                points = np.asarray(msg["points"])
-                sum_points = np.ndarray.tolist(np.sum(points, axis = 0))
-                n_elements = points.shape[0]
-                print("Sending sum to sink")
-                self.to_sink.send_json({
-                    "action" : "media",
-                    "sum_points" : sum_points, 
-                    "n_elements" : n_elements
-                })
+                self.sendMedia(msg)
             elif action == "desvesta":
-                points = np.asarray(msg["points"])
-                media = np.asarray(msg["media"])
-                sum_points = np.sum((points-media)**2, axis = 0)
-                sum_points = np.ndarray.tolist(sum_points)
-                print("Sending sum desvesta to sink")
-                self.to_sink.send_json({
-                    "action" : "desvesta",
-                    "sum_points" : sum_points, 
-                })
+                self.sendDesvesta(msg)
             elif action == "normalize":
-                has_tags = msg["has_tags"]
-                media = np.asarray(msg["media"])
-                desvesta = np.asarray(msg["desvesta"])
-                if not has_tags:
-                    points = np.asarray(msg["points"])
-                    
-                    print("Sending sum desvesta to sink")
-                else:
-                    points_tags = np.asarray(msg["points"])
-                    points = points_tags[:, :-1]
-                    tags = np.ndarray.tolist(points_tags[:, -1])
-                
-                points = points.astype(np.float)
-                media = media.astype(np.float)
-                desvesta = desvesta.astype(np.float)
-                points = (points - media)/desvesta
-                points = np.ndarray.tolist(points)
-
-                response = {
-                    "action" : "normalize",
-                    "points" : points, 
-                    "has_tags" : has_tags
-                }
-                if has_tags:
-                    response["tags"] = tags
-
-                print("Sending sum desvesta to sink")
-                self.to_sink.send_json(response)
-
-            elif action == "end":
-                print("Sending end to sink")
-                self.to_sink.send_json({
-                    "action" : "end",
-                })
+                self.normalizePoints(msg)
+            elif action == "new_dataset":
+                self.recieveInitialData(msg)
 
 
     def __init__(self, dir_ventilator, dir_sink):

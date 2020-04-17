@@ -74,8 +74,8 @@ class VentilatorElbow:
         for n_cluster in range(self.n_clusters_min, self.n_clusters_max + 1):
             ventilator = Ventilator(self.name_dataset, self.has_tags, 
                                     "127.0.0.1:5555", "127.0.0.1:5556", 
-                                    "127.0.0.1:5557", n_cluster, 
-                                    self.distance_metric)
+                                    "127.0.0.1:5557", self.n_data, self.n_features, 
+                                    n_cluster, self.distance_metric)
             ventilator.kmeans()
             centroids = ventilator.centroids
             n_data = ventilator.n_data
@@ -104,11 +104,14 @@ class VentilatorElbow:
         plt.savefig(f"results_elbow/{name_fig}")
     
     def __init__(self, name_dataset, has_tags, my_dir, 
-                    my_dir_sink, dir_sink, n_clusters_min, 
+                    my_dir_sink, dir_sink, n_data, 
+                    n_features, n_clusters_min, 
                     n_clusters_max, distance_metric):
 
         self.name_dataset = name_dataset
         self.distance_metric = distance_metric
+        self.n_data = n_data 
+        self.n_features = n_features
         self.n_clusters_min = n_clusters_min
         self.n_clusters_max = n_clusters_max
         self.has_tags = has_tags
@@ -126,6 +129,8 @@ def createConsole():
     console.add_argument("my_dir2", type=str)
     console.add_argument("dir_sink", type=str)
     console.add_argument("name_file", type=str)
+    console.add_argument("n_data", type=int)
+    console.add_argument("n_features", type=int)
     console.add_argument("n_clusters_min", type=int)
     console.add_argument("n_clusters_max", type=int)
     console.add_argument("distance_metric", type=str)
@@ -136,6 +141,7 @@ if __name__ == "__main__":
     args = createConsole()
     ventilator_elbow = VentilatorElbow(args.name_file, args.tags,
                             args.my_dir, args.my_dir2, args.dir_sink, 
+                            args.n_data, args.n_features,
                             args.n_clusters_min, args.n_clusters_max, 
                             args.distance_metric)
     ventilator_elbow.elbowMethod()

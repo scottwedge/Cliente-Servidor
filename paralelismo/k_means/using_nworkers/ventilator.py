@@ -23,9 +23,9 @@ En esta aproximacion, el ventilator:
 """
 
 class Ventilator:
-    max_iters = 10000
-    chunk_worker = 10000
-    tolerance = 0.01
+    max_iters = 100000
+    chunk_worker = 100
+    tolerance = 0.001
 
     def createSockets(self):
         self.context = zmq.Context()
@@ -56,30 +56,13 @@ class Ventilator:
         reading = values.shape[0] == self.chunk_worker
         return values, reading 
 
+    def createCentroidsNetflix(self):
+        self.centroids = []
+        for i in range(self.n_clusters):
+            value = np.random.randint(6, size= self.n_features)
+            value = np.ndarray.tolist(value)
+            self.centroids.append(value)
 
-
-    def instanciateDatasetNetflix(self):
-        self.n_data = 480189
-        self.n_features = 17770 
-
-        
-    def instanciateDataset(self):
-        #Abre el dataset con la ayuda de pandas y de la funcion
-        #readPartDataset()
-        self.n_data = 0
-        i = 0
-        reading = True
-        while reading:
-            values, reading = self.readPartDataset(i)
-            if i == 0:
-                self.n_features = values.shape[1]
-            self.n_data += values.shape[0]
-
-            if reading and self.n_features == 2:
-                plt.scatter(values[:, 0], values[:, 1], c = "salmon")
-            i += self.chunk_worker
-        if self.n_features == 2:
-            plt.show()
 
     def createCentroids(self):
         #Creamos los centroides de manera aleatoria en el rango de cada 
@@ -184,7 +167,10 @@ class Ventilator:
         self.sendInitialData()
         #Creo los centroides de manera aleatoria en el rango 
         #de cada dimension de los puntos
-        self.createCentroids()
+        if self.name_dataset == "netflix-prize-data/dataset_np.csv":
+            self.createCentroidsNetflix()
+        else:
+            self.createCentroids()
 
         self.y =  np.zeros(self.n_data)
         changing = True
@@ -218,7 +204,11 @@ class Ventilator:
                 self.from_sink.send_string("continue")
                 if np.min(size_clusters) == 0:
                     print("EMPTY CLUSTER")
-                    self.createCentroids()
+                    if self.name_dataset == "netflix-prize-data/dataset_np.csv":
+                        self.createCentroidsNetflix()
+                    else:
+                        self.createCentroids()
+                    self.createCentroidsNetflix()
                 self.y = y_new.copy()
 
         print("END")
@@ -230,14 +220,15 @@ class Ventilator:
         self.closeSockets()
     
     def __init__(self, name_dataset, has_tags, my_dir, 
-                    my_dir_sink, dir_sink, n_clusters, 
-                    distance_metric):
+                    my_dir_sink, dir_sink, n_data, n_features, 
+                    n_clusters, distance_metric):
+
         self.name_dataset = name_dataset
         self.distance_metric = distance_metric
         self.n_clusters = n_clusters
         self.has_tags = has_tags
-        #self.instanciateDataset()
-        self.instanciateDatasetNetflix()
+        self.n_data = n_data
+        self.n_features = n_features
 
         self.my_dir = my_dir
         self.my_dir_sink = my_dir_sink
@@ -252,6 +243,8 @@ def createConsole():
     console.add_argument("my_dir2", type=str)
     console.add_argument("dir_sink", type=str)
     console.add_argument("name_file", type=str)
+    console.add_argument("n_data", type=int)
+    console.add_argument("n_features", type=int)
     console.add_argument("n_clusters", type=int)
     console.add_argument("distance_metric", type=str)
     console.add_argument("-t", "--tags", action="store_true")
@@ -261,5 +254,6 @@ if __name__ == "__main__":
     args = createConsole()
     ventilator = Ventilator(args.name_file, args.tags,
                             args.my_dir, args.my_dir2, args.dir_sink, 
-                            args.n_clusters, args.distance_metric)
+                            args.n_data, args.n_features, args.n_clusters,  
+                            args.distance_metric)
     ventilator.kmeans()
