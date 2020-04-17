@@ -100,6 +100,8 @@ class VentilatorElbow:
             self.from_sink.send(b" ")
         plt.plot(n_clusters, distorsions)
         plt.show()
+        name_fig = self.name_dataset.split(".")[0] + "_elbow.png"
+        plt.savefig(f"results_elbow/{name_fig}")
     
     def __init__(self, name_dataset, has_tags, my_dir, 
                     my_dir_sink, dir_sink, n_clusters_min, 

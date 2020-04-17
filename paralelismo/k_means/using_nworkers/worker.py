@@ -50,6 +50,7 @@ class Worker:
                 elif self.distance_metric == "angular":
                     distance_point.append(cosineSimilarity(p, centroid))
             distances.append(distance_point)
+
         return distances
     
     
@@ -61,10 +62,12 @@ class Worker:
         y = []
         #Inicializo los clusters vacios
         sum_points = np.zeros((self.n_clusters, self.n_features))
+
         for i in range(len(points)):
             index_min = int(np.argmin(distances[i]))
             y.append(index_min) #Tags
             sum_points[index_min] += points[i] #Suma de los puntos
+
         return (y, sum_points)
 
 
@@ -73,20 +76,25 @@ class Worker:
         print("Ready")
         while True:
             msg = self.from_ventilator.recv_json()
-            if msg["action"] == "new_dataset":
+            action = msg["action"]
+            if action == "new_dataset":
                     self.recieveInitialData(msg)
-            else:
+            elif action == "operate":
                 ini = msg["position"]
+
                 print("Calculating distance")
                 centroids = msg["centroids"]
+
                 points = self.readPartDataset(ini)
                 distances = self.calculateDistances(centroids, points)
                 tags, sum_points = self.calculateTagsAndSum(distances, points)
+
                 self.to_sink.send_json({
                     "tags" : tags,
                     "sum_points" : np.ndarray.tolist(sum_points), 
                     "position" : ini
                 })
+
 
 
     def createSockets(self):

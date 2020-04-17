@@ -23,8 +23,8 @@ En esta aproximacion, el ventilator:
 """
 
 class Ventilator:
-    max_iters = 1000
-    chunk_worker = 100
+    max_iters = 10000
+    chunk_worker = 10000
     tolerance = 0.01
 
     def createSockets(self):
@@ -57,6 +57,12 @@ class Ventilator:
         return values, reading 
 
 
+
+    def instanciateDatasetNetflix(self):
+        self.n_data = 480189
+        self.n_features = 17770 
+
+        
     def instanciateDataset(self):
         #Abre el dataset con la ayuda de pandas y de la funcion
         #readPartDataset()
@@ -94,7 +100,7 @@ class Ventilator:
         #muestra solo al final 
 
         colors = []
-        for color in TABLEAU_COLORS:
+        for color in list(TABLEAU_COLORS):
             colors.append(color.split(":")[-1])
         reading = True 
         i = 0
@@ -147,9 +153,6 @@ class Ventilator:
         # de puntos punto a todos los  cluster
         i = 0
         while i < self.n_data:
-            i_max = i + self.chunk_worker 
-            if i_max > self.n_data:
-                i_max = self.n_data
             self.to_workers.send_json({
                 "action" : "operate",
                 "centroids" : self.centroids, 
@@ -159,7 +162,9 @@ class Ventilator:
     
     def writeTags(self):
         #Escribe el vector y en un nuevo csv 
-        name_result = self.name_dataset.split(".")[0] + "_result.csv"
+        name_result = (self.name_dataset.split(".")[0] +
+                        f"_result{self.n_clusters}c.csv")
+        print("Saved in", name_result)
         with open(join("datasets", name_result), 'w') as f:
             writer = csv.writer(f)
             writer.writerow(["tag"])
@@ -169,7 +174,13 @@ class Ventilator:
 
     def kmeans(self):
         #Metodo k_means paralelizado.
-        input("Press enter when workers are ready")
+        
+        i = 5
+        while i > 0:
+            print(f"Starting in {i} sec")
+            time.sleep(1)
+            i -= 1
+
         self.sendInitialData()
         #Creo los centroides de manera aleatoria en el rango 
         #de cada dimension de los puntos
@@ -189,7 +200,7 @@ class Ventilator:
             #centroides
             print("Waiting result from sink")
             result = self.from_sink.recv_json()
-            self.from_sink.send(b" ")
+            
 
             size_clusters = result["sizes"]
             y_new = result["y"]
@@ -202,7 +213,12 @@ class Ventilator:
             #Si ningun punto ha cambiado de cluster paro de iterar
             if falses*100.0/self.n_data < self.tolerance:
                 changing = False
+                self.from_sink.send_string("end")
             else:
+                self.from_sink.send_string("continue")
+                if np.min(size_clusters) == 0:
+                    print("EMPTY CLUSTER")
+                    self.createCentroids()
                 self.y = y_new.copy()
 
         print("END")
@@ -220,8 +236,9 @@ class Ventilator:
         self.distance_metric = distance_metric
         self.n_clusters = n_clusters
         self.has_tags = has_tags
-        self.instanciateDataset()
-        
+        #self.instanciateDataset()
+        self.instanciateDatasetNetflix()
+
         self.my_dir = my_dir
         self.my_dir_sink = my_dir_sink
         self.dir_sink = dir_sink

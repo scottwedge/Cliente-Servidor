@@ -38,7 +38,9 @@ de todos los puntos con respecto a su cluster
 
 ## Para correrlo 
 
-Cabe recalcar que en cada iteracion el sink normal debe reiniciarse 
+Cabe recalcar que:
+* Debe estar corriendo el kmeans paralelizado normal con sus workers y sink
+* En cada iteracion, cuando se cambia el numero de clsters, el sink normal debe reiniciarse 
 
 ### Ventilator elbow
 1. Direccion del ventilator para los workers

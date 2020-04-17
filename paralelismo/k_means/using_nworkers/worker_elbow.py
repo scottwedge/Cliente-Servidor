@@ -37,8 +37,10 @@ class Worker:
         #Por ahora no se usa, ya que como no se cuantos workers tengo
         #no puedo enviar el data set al inicio
         self.name_dataset = msg["name_dataset"]
-        self.name_tags = self.name_dataset.split(".")[0] + "_result.csv"
         self.n_clusters = msg["n_clusters"]
+        self.name_tags = (self.name_dataset.split(".")[0] + 
+                            f"_result{self.n_clusters}c.csv")
+        print("New name tag:", self.name_tags)
         self.centroids = msg["centroids"]
         self.n_features = msg["n_features"]
         self.chunk = msg["chunk"]
@@ -57,16 +59,25 @@ class Worker:
                 distorsion += cosineSimilarity(p, self.centroids[tag])**2
         return distorsion
     
-            
+    
     def listen(self): 
+        updated_centroids = False
         print("Ready")
         while True:
             msg = self.from_ventilator.recv_json()
             if msg["action"] == "new_dataset":
                     self.recieveInitialData(msg)
-            elif msg["action"] == "update_centroids":
+                    updated_centroids = False
+            elif msg["action"] == "update_centroids" and not updated_centroids:
+                updated_centroids = True
+                self.n_clusters += 1
                 self.centroids = msg["centroids"]
-            else:
+                self.name_tags = (self.name_dataset.split(".")[0] + 
+                            f"_result{self.n_clusters}c.csv")
+                print("New name tag:", self.name_tags)
+                
+            elif msg["action"] == "distance":
+                updated_centroids = False
                 ini = msg["position"]
                 print("Calculating distorsion")
                 points, tags = self.readPartDataset(ini)

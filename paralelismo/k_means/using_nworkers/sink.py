@@ -44,42 +44,48 @@ class Sink:
     #Funcion donde le llegara el mensaje del ventilator
     def listen(self):
         print("Ready")
-        self.recieveFirstMessage()
 
-        #Lo meto en un while true porque no se cuantas iteraciones puede 
-        #llegar a realizar kmeans, por lo que siempre debe estar 
-        #disponible
+        #Este primer while true me servira para no tener que interrumpir 
+        #el sink cada vez que quiero hacer un nuevo k means, asi podra 
+        #recibir la data inicial y volver a empezar
         while True:
-            #Inicializo la suma, los clusters y los tags
-            sum_points = np.zeros((self.n_clusters, self.n_features))
-            y = [0] * self.n_data
-            for oper in range(self.opers):
-                msg = self.from_ventilator.recv_json()
-                y_temp = msg["tags"]
-                sum_points_temp = msg["sum_points"]
-                ini = msg["position"]
-                fin = ini + self.chunk
-                if fin > self.n_data:
-                    fin = self.n_data
-                y[ini:fin] = y_temp.copy() #Voy armando el vector de tags
-                for i in range(self.n_clusters):
-                    sum_points[i] += sum_points_temp[i] #Sumo los resultados de cada worker
-                        
-            
-            sizes = self.calculateSizeClusters(y)
-            #Promedio la suma para encontrar la posicion del centroide
-            for i, size in enumerate(sizes):
-                if size != 0:
-                    sum_points[i] = sum_points[i] / size
+            self.recieveFirstMessage()
 
-            print("Sending to fan")
-            
-            self.to_ventilator.send_json({
-                "centroids" : np.ndarray.tolist(sum_points),
-                "y" : y,
-                "sizes" : sizes
-            })
-            self.to_ventilator.recv()
+            #Lo meto en un while true porque no se cuantas iteraciones puede 
+            #llegar a realizar kmeans, por lo que siempre debe estar 
+            #disponible
+            end = False
+            while not end:
+                #Inicializo la suma, los clusters y los tags
+                sum_points = np.zeros((self.n_clusters, self.n_features))
+                y = [0] * self.n_data
+                for oper in range(self.opers):
+                    msg = self.from_ventilator.recv_json()
+                    y_temp = msg["tags"]
+                    sum_points_temp = msg["sum_points"]
+                    ini = msg["position"]
+                    fin = ini + self.chunk
+                    if fin > self.n_data:
+                        fin = self.n_data
+                    y[ini:fin] = y_temp.copy() #Voy armando el vector de tags
+                    for i in range(self.n_clusters):
+                        sum_points[i] += sum_points_temp[i] #Sumo los resultados de cada worker
+                            
+                
+                sizes = self.calculateSizeClusters(y)
+                #Promedio la suma para encontrar la posicion del centroide
+                for i, size in enumerate(sizes):
+                    if size != 0:
+                        sum_points[i] = sum_points[i] / size
+
+                print("Sending to fan")
+                
+                self.to_ventilator.send_json({
+                    "centroids" : np.ndarray.tolist(sum_points),
+                    "y" : y,
+                    "sizes" : sizes
+                })
+                end = self.to_ventilator.recv_string() == "end"
 
     def __init__(self, dir_sink, dir_ventilator):
         self.dir_sink = dir_sink
