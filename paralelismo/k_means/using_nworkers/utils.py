@@ -16,3 +16,11 @@ def cosineSimilarity(p1, p2):
     norm_b = np.linalg.norm(p2)
     angle = np.arccos(ab/(norm_a*norm_b))
     return angle 
+
+
+def cosineSimilarityForSparse(v1, v2)
+    ab = v1.dot(v2.T).toarray()[0][0]
+    norm_a = np.sqrt(np.sum(v1.power(2)))
+    norm_b = np.sqrt(np.sum(v2.power(2)))
+    angle = np.arccos(ab/(norm_a*norm_b))
+    return angle
