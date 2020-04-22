@@ -7,6 +7,7 @@ import time
 import pandas as pd 
 from os.path import join
 import csv 
+import scipy.sparse as sparse
 from matplotlib.colors import TABLEAU_COLORS
 """
 En esta aproximacion, el ventilator:
@@ -24,7 +25,7 @@ En esta aproximacion, el ventilator:
 
 class Ventilator:
     max_iters = 100000
-    chunk_worker = 100
+    chunk_worker = 10000
     tolerance = 0.001
 
     def createSockets(self):
@@ -57,11 +58,15 @@ class Ventilator:
         return values, reading 
 
     def createCentroidsNetflix(self):
-        self.centroids = []
-        for i in range(self.n_clusters):
-            value = np.random.randint(6, size= self.n_features)
-            value = np.ndarray.tolist(value)
-            self.centroids.append(value)
+        #Crea una matriz dispersa para inicializar los centroides
+       
+        self.centroids = sparse.random(self.n_clusters, self.n_features, 
+                            density=0.01, format='csr', dtype=np.int8,  
+                            
+                            data_rvs=lambda x: np.random.randint(0, 6, size = x))
+        #Los vuelvo una lista para poder enviarlos al json 
+        self.centroids = np.ndarray.tolist(self.centroids.toarray())
+        
 
 
     def createCentroids(self):
@@ -140,6 +145,7 @@ class Ventilator:
                 "action" : "operate",
                 "centroids" : self.centroids, 
                 "position" : i
+                
             })
             i += self.chunk_worker
     
@@ -167,7 +173,7 @@ class Ventilator:
         self.sendInitialData()
         #Creo los centroides de manera aleatoria en el rango 
         #de cada dimension de los puntos
-        if self.name_dataset == "netflix-prize-data/dataset_np.csv":
+        if self.name_dataset == "netflix-prize-data/netflix":
             self.createCentroidsNetflix()
         else:
             self.createCentroids()
@@ -204,7 +210,7 @@ class Ventilator:
                 self.from_sink.send_string("continue")
                 if np.min(size_clusters) == 0:
                     print("EMPTY CLUSTER")
-                    if self.name_dataset == "netflix-prize-data/dataset_np.csv":
+                    if self.name_dataset == "netflix-prize-data/netflix":
                         self.createCentroidsNetflix()
                     else:
                         self.createCentroids()
