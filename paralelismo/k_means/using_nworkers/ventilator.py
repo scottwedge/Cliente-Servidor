@@ -25,7 +25,7 @@ En esta aproximacion, el ventilator:
 
 class Ventilator:
     max_iters = 100000
-    chunk_worker = 10000
+    chunk_worker = 200
     tolerance = 0.001
 
     def createSockets(self):

@@ -48,6 +48,8 @@ class Worker:
                     distance_point.append(cuadraticEuclideanDistanceSparse(p, centroid))
                 elif self.distance_metric == "angular":
                     distance_point.append(cosineSimilarityForSparse(p, centroid))
+                    #distance_point.append(cosineSimilarityForSparse2(p, centroid))
+
             #A partir de las distancias anteriormente calculadas, crea 
             #los tags, ademas de sumar los puntos de cada
             #cluster para que luego el sink los pueda promediar

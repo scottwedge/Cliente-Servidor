@@ -1,5 +1,6 @@
 import numpy as np 
 import scipy 
+from sklearn.metrics.pairwise import cosine_similarity
 
 """
 La similaridad oscila entre -1 y 1, por lo que no la podemos usar 
@@ -21,12 +22,17 @@ def cosineSimilarity(p1, p2):
 
 
 def cosineSimilarityForSparse(v1, v2):
-    ab = v1.dot(v2.T).toarray()[0][0]
+    if v1.shape[1] != v2.shape[0]:
+        ab = v1.dot(v2.T).toarray()[0][0]
+    else:
+       ab = v1.dot(v2).toarray()[0][0] 
     norm_a = np.sqrt(np.sum(v1.power(2)))
     norm_b = np.sqrt(np.sum(v2.power(2)))
     angle = np.arccos(ab/(norm_a*norm_b))
     return angle
 
+def cosineSimilarityForSparse2(v1, v2):
+    return np.arccos(cosine_similarity(v1, v2)[0][0])
 
 def cuadraticEuclideanDistanceSparse(v1, v2):
     return np.sum((v1-v2).power(2))

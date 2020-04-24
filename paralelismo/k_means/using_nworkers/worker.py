@@ -49,7 +49,7 @@ class Worker:
                 if self.distance_metric == "euclidean":
                     distance_point.append(distance.euclidean(p, centroid))
                 elif self.distance_metric == "angular":
-                    distance_point.append(cosineSimilarity(p, centroid))
+                   distance_point.append(cosineSimilarity(p, centroid))
             
             #A partir de las distancias anteriormente calculadas, crea 
             #los clusters y los tags, ademas de sumar los puntos de cada
