@@ -1,31 +1,20 @@
 """
-    Para esta implementacion, cada worker:
-    1.Calcula la distancia del los que le llegaron puntos a 
-      todos los centroides
-    2.Con esta distancia saca el vector de tags y los clusters para
-    el numero determinado de puntos 
+    Solo cambia las funciones de distancia y la forma de abrir 
+    el dataset, la suma de los puntos ahora tambien es una matriz
+    dispersa 
 """
 import zmq
 import argparse 
-from scipy.spatial import distance
 import numpy as np
-from sklearn.datasets import make_blobs
-import pandas as pd
-from os.path import join 
 from utils import *
-
+import time 
 
 class Worker:
 
     def readPartDataset(self, ini):
-        data = pd.read_csv(self.name_dataset, 
-                            skiprows=ini, nrows=self.chunk)
-        if self.has_tags:
-            values = data.values[:, :-1]
-        else:
-            values = data.values     
-        values = values.astype(float)   
-        return values
+        data = readSparseManual(self.name_dataset, ini, self.chunk)
+        print("Data readed", len(data))
+        return data
 
     def recieveInitialData(self, msg):
         #Por ahora no se usa, ya que como no se cuantos workers tengo
@@ -39,28 +28,39 @@ class Worker:
         self.has_tags  = msg["has_tags"]
 
     def calculateTagsAndSum(self, centroids, points):
-        #Calcula la distancia entre unos puntos y todos los centroides
+        #Calcula la distancia entre unos puntos y todos los centroides, con esto
+        #saca la el cluster mas acercado para asi construir el vector de tags y 
+        #la suma de los puntos de cada cluster
+        #Matriz de tamanio data * centroids
         y = []
-        #Inicializo la suma de los puntos vacios
-        sum_points = np.zeros((self.n_clusters, self.n_features))
-        for p in (points):
+
+        #sum_points = np.zeros((self.n_clusters, self.n_features))
+        sum_points = []
+        for i in range(self.n_clusters):
+            sum_points.append({})
+
+        init_time = time.time()
+        for p in points:
             distance_point = []
             for centroid in centroids:
                 if self.distance_metric == "euclidean":
-                    distance_point.append(distance.euclidean(p, centroid))
+                    distance_point.append(cuadraticEuclideanDistanceSparseManual(p, centroid))
                 elif self.distance_metric == "angular":
-                   distance_point.append(cosineSimilarity(p, centroid))
-            
+                    distance_point.append(cosineSimilaritySparseManual(p, centroid))
+
             #A partir de las distancias anteriormente calculadas, crea 
-            #los clusters y los tags, ademas de sumar los puntos de cada
+            #los tags, ademas de sumar los puntos de cada
             #cluster para que luego el sink los pueda promediar
             index_min = int(np.argmin(distance_point))
             y.append(index_min) #Tags
-            sum_points[index_min] += p #Suma de los puntos
+            sum_points[index_min] = sumPointsDict(sum_points[index_min], p)
+            #sum_points[index_min] = sumDictAndPoint(sum_points[index_min], p)
 
-        return (y, sum_points)
-    
-
+        print(f"Time {time.time()-init_time}")
+        print(y)
+        return  (y, sum_points)
+        #return (y, np.ndarray.tolist(sum_points))
+            
     def listen(self): 
         print("Ready")
         while True:
@@ -70,17 +70,17 @@ class Worker:
                     self.recieveInitialData(msg)
             elif action == "operate":
                 ini = msg["position"]
-
-                print("Calculating distance")
+                print("Calculating tags and sum")
                 centroids = msg["centroids"]
 
                 points = self.readPartDataset(ini)
-               
+                print("Calculating tags and sum")
                 tags, sum_points = self.calculateTagsAndSum(centroids, points)
 
+                print("Sending to sink")
                 self.to_sink.send_json({
                     "tags" : tags,
-                    "sum_points" : np.ndarray.tolist(sum_points), 
+                    "sum_points" : sum_points, 
                     "position" : ini
                 })
 

@@ -45,6 +45,7 @@ class Sink:
             for oper in range(self.opers):
                 distorsion += float(self.from_ventilator.recv_string())
 
+            print("Distorsion:", distorsion)
             print("Sending to fan")
             
             self.to_ventilator.send_string(str(distorsion))

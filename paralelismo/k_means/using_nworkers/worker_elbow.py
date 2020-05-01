@@ -20,7 +20,7 @@ class Worker:
     def readPartDataset(self, ini):
         data = pd.read_csv(join("datasets", self.name_dataset), 
                             skiprows=ini, nrows=self.chunk)
-        tags = pd.read_csv(join("datasets", self.name_tags), 
+        tags = pd.read_csv(join("datasets", "results", self.name_tags), 
                             skiprows=ini, nrows=self.chunk)
                                               
         if self.has_tags:
@@ -41,7 +41,8 @@ class Worker:
         self.name_tags = (self.name_dataset.split(".")[0] + 
                             f"_result{self.n_clusters}c.csv")
         print("New name tag:", self.name_tags)
-        self.centroids = msg["centroids"]
+        self.centroids = np.asarray(msg["centroids"])
+        #print(self.centroids)
         self.n_features = msg["n_features"]
         self.chunk = msg["chunk"]
         self.distance_metric = msg["distance_metric"]
@@ -71,7 +72,8 @@ class Worker:
             elif msg["action"] == "update_centroids" and not updated_centroids:
                 updated_centroids = True
                 self.n_clusters += 1
-                self.centroids = msg["centroids"]
+                self.centroids = np.asarray(msg["centroids"])
+                #print(self.centroids)
                 self.name_tags = (self.name_dataset.split(".")[0] + 
                             f"_result{self.n_clusters}c.csv")
                 print("New name tag:", self.name_tags)

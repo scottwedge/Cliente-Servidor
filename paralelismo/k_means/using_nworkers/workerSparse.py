@@ -17,7 +17,7 @@ import time
 class Worker:
 
     def readPartDataset(self, ini):
-        data = readChunkSparse(self.chunk, ini, join("datasets", self.name_dataset), 
+        data = readChunkSparse(self.chunk, ini, self.name_dataset, 
                                 self.n_features, dtype = np.int8)
   
         return data

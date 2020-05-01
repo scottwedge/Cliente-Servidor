@@ -1,19 +1,13 @@
 """
-    1.Recoge los clusters, los tags y la suma
-     para cada centroide de los workers
-        a. Pega los clusters parciales
-        b. Promedia la suma de los puntos para cada centroide
+    Solo cambia que la suma de los puntos es una matriz dispersa 
+    y la forma de enviar el mensaje en el json
 
 """
 
 import zmq 
 import numpy as np
 import argparse
-import time
-from sklearn.datasets import make_blobs
-from os.path import join 
-import pandas as pd 
-from operator import add
+from utils import sumDictAndPoint, sumPointsDict
 class Sink:
 
     #Crea el socket donde le llega la informacion del 
@@ -58,34 +52,42 @@ class Sink:
             end = False
             while not end:
                 #Inicializo la suma, los clusters y los tags
-                sum_points = np.zeros((self.n_clusters, self.n_features))
+                sum_points = []
+                for i in range(self.n_clusters):
+                    sum_points.append({})
 
                 y = [0] * self.n_data
+
                 for oper in range(self.opers):
                     msg = self.from_ventilator.recv_json()
+                    print("Msg recieved from worker")
                     y_temp = msg["tags"]
                     sum_points_temp = msg["sum_points"]
                     ini = msg["position"]
+
                     fin = ini + self.chunk
                     if fin > self.n_data:
                         fin = self.n_data
+
                     y[ini:fin] = y_temp.copy() #Voy armando el vector de tags
                     for i in range(self.n_clusters):
+                        print("Adding points")
                         #Sumo los resultados de cada worker
-                        sum_points[i] = (
-                            list(map(add, sum_points[i], sum_points_temp[i])).copy() )
+                        sum_points[i] = sumPointsDict(sum_points[i], sum_points_temp[i])
                             
                 
                 sizes = self.calculateSizeClusters(y)
                 #Promedio la suma para encontrar la posicion del centroide
                 for i, size in enumerate(sizes):
                     if size != 0:
-                        sum_points[i] = sum_points[i] / size
+                        for key in sum_points[i].keys():
+                            sum_points[i][key] = sum_points[i][key] / size
 
                 print("Sending to fan")
                 
                 self.to_ventilator.send_json({
-                    "centroids" : np.ndarray.tolist(sum_points),
+                    #"centroids" : np.ndarray.tolist(sum_points),
+                    "centroids" : sum_points,
                     "y" : y,
                     "sizes" : sizes
                 })

@@ -9,6 +9,9 @@ from os.path import join
 import csv 
 import scipy.sparse as sparse
 from matplotlib.colors import TABLEAU_COLORS
+import json
+import linecache
+from utils import readSparseManual
 """
 En esta aproximacion, el ventilator:
 1.Instancia los centroides
@@ -25,8 +28,8 @@ En esta aproximacion, el ventilator:
 
 class Ventilator:
     max_iters = 100000
-    chunk_worker = 200
-    tolerance = 0.001
+    chunk_worker = 100
+    tolerance = 0.01
 
     def createSockets(self):
         self.context = zmq.Context()
@@ -57,29 +60,32 @@ class Ventilator:
         reading = values.shape[0] == self.chunk_worker
         return values, reading 
 
-    def createCentroidsNetflix(self):
-        #Crea una matriz dispersa para inicializar los centroides
-       
-        self.centroids = sparse.random(self.n_clusters, self.n_features, 
-                            density=0.01, format='csr', dtype=np.int8,  
-                            
-                            data_rvs=lambda x: np.random.randint(0, 6, size = x))
-        #Los vuelvo una lista para poder enviarlos al json 
-        self.centroids = np.ndarray.tolist(self.centroids.toarray())
-        
-
 
     def createCentroids(self):
         #Creamos los centroides de manera aleatoria en el rango de cada 
         #caracteristica
         self.centroids = []
         for i in range(self.n_clusters):
-            number = np.random.randint(0, high=self.n_data)
-            value = pd.read_csv(join("datasets", self.name_dataset), 
-                                skiprows=number, nrows=1).values
-            if self.has_tags:
-                value = value[:, :-1]
-            value = np.ndarray.tolist(value.astype(float))
+            number = np.random.randint(1, high=self.n_data-1)
+
+            with open(join("datasets", self.name_dataset), "r") as f:
+                for i in range(number):
+                    f.readline()
+                value = f.readline()
+
+            if self.name_dataset == "netflix-prize-data/netflix2.txt" or \
+                self.name_dataset == "netflix-prize-data/netflix2_little.txt":
+                #centroid = [0] * self.n_features
+                value = json.loads(value[:-1])
+                # for key in value.keys():
+                #     centroid[int(key)] = value[key]
+                # value = centroid.copy()
+            else:
+                value = np.fromstring(value, sep = ",")
+                if self.has_tags:
+                    value = value[:-1]
+                value = np.ndarray.tolist(value)
+
             self.centroids.append(value)
     
 
@@ -113,7 +119,7 @@ class Ventilator:
         while i < self.n_data:
             self.to_workers.send_json({
                 "action" : "new_dataset",
-                "name_dataset" : self.name_dataset,
+                "name_dataset" : join("datasets", self.name_dataset),
                 "n_clusters" : self.n_clusters,
                 "n_features" : self.n_features,
                 "has_tags" : self.has_tags,
@@ -154,17 +160,16 @@ class Ventilator:
         name_result = (self.name_dataset.split(".")[0] +
                         f"_result{self.n_clusters}c.csv")
         print("Saved in", name_result)
-        with open(join("datasets", name_result), 'w') as f:
-            writer = csv.writer(f)
-            writer.writerow(["tag"])
+        with open(join("datasets", "results", name_result), 'w') as f:
+            f.write("tag\n")
             for tag in self.y:
-                writer.writerow([tag])
+                f.write(str(tag)+"\n")
             
 
     def kmeans(self):
         #Metodo k_means paralelizado.
         
-        i = 5
+        i = 3
         while i > 0:
             print(f"Starting in {i} sec")
             time.sleep(1)
@@ -173,12 +178,9 @@ class Ventilator:
         self.sendInitialData()
         #Creo los centroides de manera aleatoria en el rango 
         #de cada dimension de los puntos
-        if self.name_dataset == "netflix-prize-data/netflix":
-            self.createCentroidsNetflix()
-        else:
-            self.createCentroids()
+        self.createCentroids()
 
-        self.y =  np.zeros(self.n_data)
+        self.y =  np.zeros(self.n_data, dtype = np.int8)
         changing = True
         iters = 0
         while changing and iters < self.max_iters:
@@ -203,18 +205,14 @@ class Ventilator:
             falses = np.equal(self.y, np.asarray(y_new))
             falses = np.sum(np.where(falses == False, 1, 0))
             #Si ningun punto ha cambiado de cluster paro de iterar
-            if falses*100.0/self.n_data < self.tolerance:
+            if falses/self.n_data < self.tolerance:
                 changing = False
                 self.from_sink.send_string("end")
             else:
                 self.from_sink.send_string("continue")
                 if np.min(size_clusters) == 0:
                     print("EMPTY CLUSTER")
-                    if self.name_dataset == "netflix-prize-data/netflix":
-                        self.createCentroidsNetflix()
-                    else:
-                        self.createCentroids()
-                    self.createCentroidsNetflix()
+                    self.createCentroids()
                 self.y = y_new.copy()
 
         print("END")

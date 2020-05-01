@@ -14,6 +14,7 @@ if __name__ == "__main__":
                             "127.0.0.1:5555", 
                             "127.0.0.1:5556", 
                             "127.0.0.1:5557", 
+                            150, 4,
                             n_clusters, "euclidean")
     tags_true = pd.read_csv(join("datasets", name_file), usecols=["tag"]).values
     ventilator.kmeans()

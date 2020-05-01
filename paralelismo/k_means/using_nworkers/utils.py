@@ -1,6 +1,7 @@
 import numpy as np 
 import scipy 
 from sklearn.metrics.pairwise import cosine_similarity
+import json
 
 """
 La similaridad oscila entre -1 y 1, por lo que no la podemos usar 
@@ -22,6 +23,8 @@ def cosineSimilarity(p1, p2):
 
 
 def cosineSimilarityForSparse(v1, v2):
+    #Primera funcion de similaridad de cosenos intentada para los 
+    #datos dispersos
     if v1.shape[1] != v2.shape[0]:
         ab = v1.dot(v2.T).toarray()[0][0]
     else:
@@ -34,6 +37,33 @@ def cosineSimilarityForSparse(v1, v2):
 def cosineSimilarityForSparse2(v1, v2):
     return np.arccos(cosine_similarity(v1, v2)[0][0])
 
+
+
+def cosineSimilaritySparseManual(p1, p2):
+    all_keys = {**p1, **p2}
+    norm_a = 0
+    norm_b = 0
+    ab = 0
+    for key in p1.keys():
+        a = p1.get(key, 0)
+        b = p2.get(key, 0)
+
+        norm_a += a**2
+        norm_b += b**2
+
+        ab += a*b
+    return np.arccos(ab/(np.sqrt(norm_a) * np.sqrt(norm_b)))
+
+
+def cuadraticEuclideanDistanceSparseManual(p1, p2):
+    all_keys = {**p1, **p2}
+    cuadratic_distance = 0
+    for key in all_keys.keys():
+        a = p1.get(key, 0)
+        b = p2.get(key, 0)
+        cuadratic_distance += (a-b) ** 2
+    return cuadratic_distance
+    
 def cuadraticEuclideanDistanceSparse(v1, v2):
     return np.sum((v1-v2).power(2))
 
@@ -102,3 +132,39 @@ def readChunkSparse(n_rows, offset, name_dataset, column_size, dtype=np.float32)
                         batch_indices, indptr_real), shape=dimensions)
 
         return matrix
+
+def hola():
+    print("Hola")
+def sumPointsDict(p1, p2):
+    #Suma dos puntos dispersos que estan en forma de diccionario
+    new_point = {**p1, **p2}
+    for key in new_point.keys():
+        a = p1.get(key, 0)
+        b = p2.get(key, 0)
+        new_point[key] = a+b
+    return new_point
+
+def sumDictAndPoint(p, d):
+    #Suma un punto que es una lista normal y otro que esta en forma de 
+    #diccionario 
+    for key in d.keys():
+        p[int(key)] += d[key]
+    return p
+
+
+def readSparseManual(name_dataset, skiprows, chunk):
+    #Lee los datos del dataset que es una matriz dispersa hecha con una 
+    #lista de directorios
+    points = []
+    with open(name_dataset, "r") as f:
+        for i in range(skiprows):
+            f.readline()
+        
+        for i in range(chunk):
+            line = f.readline()
+            if line == "":
+                break
+            points.append(json.loads(line[:-1]))
+
+    return points
+            
