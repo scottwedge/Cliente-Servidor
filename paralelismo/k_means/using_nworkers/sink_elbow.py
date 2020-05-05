@@ -27,17 +27,17 @@ class Sink:
         self.to_ventilator.connect(f"tcp://{self.dir_ventilator}")
 
 
-    def recieveFirstMessage(self):
+    def receiveFirstMessage(self):
         msg = self.from_ventilator.recv_json()
         self.iters = msg["iters"] #Numero de veces que se corre el kmeans
         self.opers = msg["opers"] #Numero de tareas paralelizadas para calcular 
                                   #la distorsion en cada momento que se corre kmeans
-        print("Recieve first message")
+        print("Receive first message")
 
     #Funcion donde le llegara el mensaje del ventilator
     def listen(self):
         print("Ready")
-        self.recieveFirstMessage()
+        self.receiveFirstMessage()
 
         for iter in range(self.iters):
             #Inicializo la suma, los clusters y los tags

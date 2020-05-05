@@ -39,13 +39,13 @@ class Worker:
                                 centers = self.n_clusters, 
                                 random_state=random_state)
 
-    def recieveInitialData(self, msg):
+    def receiveInitialData(self, msg):
         #Recibe el dataset entero para no recibirlo muchas veces
         self.n_clusters = msg["n_clusters"]
         self.n_features = msg["n_features"]
         self.n_data = msg["n_data"]
         random_state = msg["random_state"]
-        print("Recieved first message")
+        print("Received first message")
         self.instanciateDataset(random_state)
 
 
@@ -87,7 +87,7 @@ class Worker:
             elif oper == "move_centroid":
                 self.sendClusterAndCentroid(msg)
             elif oper == "new_dataset":
-                self.recieveInitialData(msg)
+                self.receiveInitialData(msg)
 
     def createSockets(self):
         self.context = zmq.Context()

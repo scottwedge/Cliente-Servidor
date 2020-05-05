@@ -96,7 +96,7 @@ class VentilatorElbow:
 
             
             distorsions.append(float(self.from_sink.recv_string()))
-            print("Distorsion recieved")
+            print("Distorsion received")
             self.from_sink.send(b" ")
         plt.plot(n_clusters, distorsions)
         plt.show()

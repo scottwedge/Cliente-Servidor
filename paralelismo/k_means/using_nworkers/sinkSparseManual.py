@@ -21,14 +21,14 @@ class Sink:
         self.to_ventilator = self.context.socket(zmq.REQ)
         self.to_ventilator.connect(f"tcp://{self.dir_ventilator}")
 
-    def recieveFirstMessage(self):
+    def receiveFirstMessage(self):
         msg = self.from_ventilator.recv_json()
         self.n_clusters = msg["n_clusters"]
         self.n_data = msg["n_data"]
         self.n_features = msg["n_features"]
         self.opers = msg["opers"]
         self.chunk = msg["chunk"]
-        print("Recieve first message")
+        print("Receive first message")
 
     def calculateSizeClusters(self, y):
         sizes = [0] * self.n_clusters
@@ -44,7 +44,7 @@ class Sink:
         #el sink cada vez que quiero hacer un nuevo k means, asi podra 
         #recibir la data inicial y volver a empezar
         while True:
-            self.recieveFirstMessage()
+            self.receiveFirstMessage()
 
             #Lo meto en un while true porque no se cuantas iteraciones puede 
             #llegar a realizar kmeans, por lo que siempre debe estar 
@@ -60,7 +60,7 @@ class Sink:
 
                 for oper in range(self.opers):
                     msg = self.from_ventilator.recv_json()
-                    print("Msg recieved from worker")
+                    print("Msg received from worker")
                     y_temp = msg["tags"]
                     sum_points_temp = msg["sum_points"]
                     ini = msg["position"]

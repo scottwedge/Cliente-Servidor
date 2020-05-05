@@ -9,8 +9,8 @@ class Sink:
 
     def createSockets(self):
         self.context = zmq.Context()
-        self.reciever = self.context.socket(zmq.PULL)
-        self.reciever.bind(f"tcp://{self.my_dir}")
+        self.receiver = self.context.socket(zmq.PULL)
+        self.receiver.bind(f"tcp://{self.my_dir}")
         
         self.to_ventilator = self.context.socket(zmq.REQ)
         self.to_ventilator.connect(f"tcp://{self.dir_ventilator}")
@@ -20,8 +20,8 @@ class Sink:
     def calculateMedia(self):
         average_points = None
         for i in range(self.opers):
-            msg = self.reciever.recv_json()
-            print("Recieved msg  media from worker")
+            msg = self.receiver.recv_json()
+            print("Received msg  media from worker")
 
             if average_points is None:
                 average_points = np.asarray(msg["sum_points"])
@@ -39,8 +39,8 @@ class Sink:
         desvesta = None
 
         for i in range(self.opers):
-            msg = self.reciever.recv_json()
-            print("Recieved msg desvesta from worker")
+            msg = self.receiver.recv_json()
+            print("Received msg desvesta from worker")
             
             if desvesta is None:
                 desvesta = np.asarray(msg["sum_points"])
@@ -57,10 +57,10 @@ class Sink:
     def listen(self):
 
         print("ready")
-        initial_data = self.reciever.recv_json()
+        initial_data = self.receiver.recv_json()
         self.n_data = initial_data["n_data"]
         self.opers =  initial_data["opers"]
-        print("Initial data recieved")
+        print("Initial data received")
 
         self.calculateMedia()
         self.calculateDesvesta()

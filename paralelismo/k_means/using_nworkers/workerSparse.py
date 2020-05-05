@@ -22,7 +22,7 @@ class Worker:
   
         return data
 
-    def recieveInitialData(self, msg):
+    def receiveInitialData(self, msg):
         #Por ahora no se usa, ya que como no se cuantos workers tengo
         #no puedo enviar el data set al inicio
         self.name_dataset = msg["name_dataset"]
@@ -30,7 +30,7 @@ class Worker:
         self.n_features = msg["n_features"]
         self.chunk = msg["chunk"]
         self.distance_metric = msg["distance_metric"]
-        print("Recieved first message")
+        print("Received first message")
         self.has_tags  = msg["has_tags"]
 
     def calculateTagsAndSum(self, centroids, points):
@@ -65,7 +65,7 @@ class Worker:
             msg = self.from_ventilator.recv_json()
             action = msg["action"]
             if action == "new_dataset":
-                    self.recieveInitialData(msg)
+                    self.receiveInitialData(msg)
             elif action == "operate":
                 ini = msg["position"]
 

@@ -33,7 +33,7 @@ class Worker:
         tags = tags.astype(int)
         return (values, tags)
 
-    def recieveInitialData(self, msg):
+    def receiveInitialData(self, msg):
         #Por ahora no se usa, ya que como no se cuantos workers tengo
         #no puedo enviar el data set al inicio
         self.name_dataset = msg["name_dataset"]
@@ -45,7 +45,7 @@ class Worker:
         self.n_features = msg["n_features"]
         self.chunk = msg["chunk"]
         self.distance_metric = msg["distance_metric"]
-        print("Recieved first message")
+        print("Received first message")
         self.has_tags  = msg["has_tags"]
 
     def calculateDistances(self, points, tags):
@@ -67,7 +67,7 @@ class Worker:
             msg = self.from_ventilator.recv_json()
             if msg["action"] == "new_dataset":
                     #Cuando un nuevo dataset llega
-                    self.recieveInitialData(msg)
+                    self.receiveInitialData(msg)
                     updated_centroids = False
             elif msg["action"] == "update_centroids" and not updated_centroids:
                 #Cuando llegan nuevo centroides

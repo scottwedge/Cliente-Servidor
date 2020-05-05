@@ -47,7 +47,7 @@ class Sink:
         msg = self.from_ventilator.recv_json()
         self.n_data = msg["n_data"]
         self.n_clusters = msg["n_clusters"]
-        print("Recieve first message")
+        print("Receive first message")
 
         #Pegando todas las distanciasy calculando el minimo
         # O pegando los clusters y centroides

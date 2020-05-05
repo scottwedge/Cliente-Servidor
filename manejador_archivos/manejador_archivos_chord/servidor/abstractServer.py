@@ -141,7 +141,7 @@ class Server(ABC):
             self.socket.send_string("Server disconnected :(")
         print("Disconnected")
         
-    def recieveFiles(self, socket, from_server):
+    def receiveFiles(self, socket, from_server):
         #Recibe los archivos que le corresponden, puede ser porque
         #acaba de conectarse (recibe archivos del sucesor) o 
         #porque el predecesor se va a desconectar
@@ -152,7 +152,7 @@ class Server(ABC):
             data = socket.recv()
             with open(join("archivos", self.folder_name, hash), 'wb') as f:
                 f.write(data)
-            print("Recieved file from server", hash[:8], len(hash))
+            print("Received file from server", hash[:8], len(hash))
             socket.send(b" ")
             msg = socket.recv_json()
         if from_server == "predecessor":
@@ -168,7 +168,7 @@ class Server(ABC):
         self.predecessor = self.message["predecessor"]
         print("New predecessor", self.predecessor)
         self.socket.send(b" ")
-        self.recieveFiles(self.socket, "predecessor")
+        self.receiveFiles(self.socket, "predecessor")
 
     #Menu de entrada para todas las acciones que le lleguen al servidor
     def listen(self):

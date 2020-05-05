@@ -35,8 +35,8 @@ class Worker:
         data_y = np.ndarray.tolist(data[:, -1])
         return data_x, data_y
         
-    def recieveInitialData(self, msg):
-        print("Initial data recieved")
+    def receiveInitialData(self, msg):
+        print("Initial data received")
         self.name_normalized = msg["name_normalized"]
         self.name_dataset = msg["name_dataset"]
         self.has_tags = msg["has_tags"]
@@ -110,7 +110,7 @@ class Worker:
             elif action == "normalize":
                 self.normalizePoints(msg)
             elif action == "new_dataset":
-                self.recieveInitialData(msg)
+                self.receiveInitialData(msg)
 
 
     def __init__(self, dir_ventilator, dir_sink):

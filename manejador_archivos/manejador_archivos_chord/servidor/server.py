@@ -65,7 +65,7 @@ class NormalServer(Server):
         self.min_key = int(response["min_key"])
         self.socket_sucessor.send_json({"ip":self.ip, "port":self.port})
         
-        self.recieveFiles(socket_req, "sucessor")
+        self.receiveFiles(socket_req, "sucessor")
         
         #Este era el socket que conectaba con el sucesor, pero como ya 
         #tenemos un atributo para eso, lo usamos para contactarnos con el 
